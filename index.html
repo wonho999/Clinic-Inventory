@@ -383,6 +383,34 @@ select option{background:var(--surface2)}
 </head>
 <body>
 
+<!-- ══ 비밀번호 잠금 화면 ══ -->
+<div id="lockscreen" style="
+  display:none;position:fixed;inset:0;z-index:999;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:16px;padding:36px;width:320px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    display:flex;flex-direction:column;gap:20px;align-items:center;
+  ">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+      <div style="width:44px;height:44px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px">🏥</div>
+      <div style="font-size:18px;font-weight:700;letter-spacing:-.3px">재고 관리</div>
+      <div style="font-size:12px;color:var(--text3)">비밀번호를 입력하세요</div>
+    </div>
+    <div style="width:100%;display:flex;flex-direction:column;gap:10px">
+      <input type="password" id="lock-pass"
+        placeholder="비밀번호"
+        style="width:100%;text-align:center;font-size:16px;padding:12px;letter-spacing:2px"
+        onkeydown="if(event.key==='Enter') unlock()">
+      <button class="btn btn-primary" style="width:100%;height:42px;font-size:14px" onclick="unlock()">입장</button>
+    </div>
+    <div id="lock-error" style="font-size:12px;color:var(--red);display:none">비밀번호가 올바르지 않습니다</div>
+  </div>
+</div>
+
 <header>
   <div class="hlogo">
     <div class="hlogo-dot"></div>
@@ -601,26 +629,17 @@ select option{background:var(--surface2)}
       </div>
 
       <div class="card" style="max-width:440px;margin-top:12px">
-        <div class="card-head"><span class="card-title">🔄 클라우드 동기화 (Google Sheets)</span></div>
+        <div class="card-head"><span class="card-title">🔑 비밀번호 변경</span></div>
         <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
-          <div class="hint" style="background:var(--surface2);padding:10px 12px;border-radius:6px;border-left:3px solid var(--accent)">
-            ⓘ 이 앱은 Google Sheets를 데이터베이스로 사용합니다. 모든 데이터는 시트에 저장되며, 새로고침 시마다 시트에서 불러옵니다.
-          </div>
           <div class="fgroup">
-            <div class="flabel">Apps Script Web App URL *</div>
-            <input type="text" id="cfg-sync-url" placeholder="https://script.google.com/macros/s/..../exec">
-            <div class="hint">Google Apps Script에서 배포한 웹 앱 URL</div>
+            <div class="flabel">새 비밀번호</div>
+            <input type="password" id="cfg-sync-pass" placeholder="새 비밀번호 입력">
           </div>
-          <div class="fgroup">
-            <div class="flabel">비밀번호 *</div>
-            <input type="text" id="cfg-sync-pass" placeholder="Apps Script 코드의 PASSWORD와 같은 값">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="changePassword()">변경</button>
+            <button class="btn btn-outline" onclick="logoutApp()">로그아웃</button>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline" onclick="testSync()">연결 테스트</button>
-            <button class="btn btn-primary" onclick="saveSyncSettings()">저장 + 연결</button>
-            <button class="btn btn-outline" onclick="disableSync()">연결 해제</button>
-          </div>
-          <div class="hint" id="sync-info" style="margin-top:4px"></div>
+          <div class="hint" id="sync-info"></div>
         </div>
       </div>
 
@@ -722,24 +741,32 @@ let receiveId = null;
 let itemFilter = 'all';
 
 // ━━━━ SYNC MODULE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ⚠️ 이 URL만 배포 전에 변경하세요
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5Ix0UORJqFPnxHkcbO1D-Ck5J9y41nIM2s1YmlhMro3UEvTdN11FW4fBSoZjPdHWb/exec';
+
 let SYNC = {
-  url: '',           // Google Apps Script Web App URL
-  password: '',      // shared password
-  enabled: false,    // true when configured
-  status: 'offline', // offline | syncing | synced | error
+  url: SCRIPT_URL,
+  password: '',
+  enabled: false,
+  status: 'offline',
   lastSync: null,
-  queue: [],         // pending operations
+  queue: [],
   pushTimer: null,
 };
 
 function loadSyncCfg(){
+  // URL은 하드코딩 — 비밀번호만 localStorage에서 복원
   try{
     const c = JSON.parse(localStorage.getItem(SYNC_CFG_KEY));
-    if(c){ SYNC.url = c.url||''; SYNC.password = c.password||''; SYNC.enabled = !!(c.url && c.password); }
+    if(c && c.password){
+      SYNC.password = c.password;
+      SYNC.enabled = true;
+    }
   }catch(e){}
 }
 function saveSyncCfg(){
-  localStorage.setItem(SYNC_CFG_KEY, JSON.stringify({url:SYNC.url, password:SYNC.password}));
+  // 비밀번호만 저장 (URL은 코드에 고정)
+  localStorage.setItem(SYNC_CFG_KEY, JSON.stringify({ password: SYNC.password }));
 }
 
 function setSyncStatus(s, note){
@@ -1484,16 +1511,14 @@ function renderStatsSummary(){
 function loadCfg(){
   document.getElementById('cfg-weeks').value = S.cfg.defaultWeeks;
   document.getElementById('cfg-order-weeks').value = S.cfg.orderWeeks;
-  // sync fields
-  document.getElementById('cfg-sync-url').value = SYNC.url || '';
-  document.getElementById('cfg-sync-pass').value = SYNC.password || '';
   updateSyncInfo();
 }
 function updateSyncInfo(){
   const el = document.getElementById('sync-info');
   if(!el) return;
-  if(!SYNC.enabled){ el.textContent='연결 안 됨'; return; }
-  el.innerHTML = `✓ 연결됨 — ${SYNC.lastSync? '마지막 동기화: '+SYNC.lastSync.toLocaleTimeString('ko-KR'):'대기 중'}`;
+  el.innerHTML = SYNC.lastSync
+    ? `✓ 마지막 동기화: ${SYNC.lastSync.toLocaleTimeString('ko-KR')}`
+    : '';
 }
 function saveCfg(){
   S.cfg.defaultWeeks = parseInt(document.getElementById('cfg-weeks').value)||2;
@@ -1512,55 +1537,21 @@ function resetAll(){
 }
 
 // ── Sync settings UI handlers ──────────────────────────────────────
-async function testSync(){
-  const url = document.getElementById('cfg-sync-url').value.trim();
+function changePassword(){
   const pass = document.getElementById('cfg-sync-pass').value.trim();
-  if(!url || !pass){ alert('URL과 비밀번호를 입력하세요'); return; }
-  const prevUrl = SYNC.url, prevPass = SYNC.password, prevEnabled = SYNC.enabled;
-  SYNC.url = url; SYNC.password = pass; SYNC.enabled = true;
-  try{
-    const res = await apiCall('ping');
-    alert('✓ 연결 성공!\n서버 시각: ' + new Date(res.ts).toLocaleString('ko-KR'));
-  }catch(e){
-    alert('✗ 연결 실패: ' + e.message);
-    SYNC.url = prevUrl; SYNC.password = prevPass; SYNC.enabled = prevEnabled;
-  }
-}
-
-async function saveSyncSettings(){
-  const url = document.getElementById('cfg-sync-url').value.trim();
-  const pass = document.getElementById('cfg-sync-pass').value.trim();
-  if(!url || !pass){ alert('URL과 비밀번호를 입력하세요'); return; }
-  SYNC.url = url; SYNC.password = pass; SYNC.enabled = true;
+  if(!pass){ alert('새 비밀번호를 입력하세요'); return; }
+  SYNC.password = pass;
   saveSyncCfg();
-  try{
-    await apiCall('ping');
-    await syncPull();
-    alert('✓ 연결 성공! 시트 데이터를 불러왔습니다.');
-    updateSyncInfo();
-    setSyncStatus('synced');
-    go('dash');
-  }catch(e){
-    alert('연결 실패: ' + e.message);
-    setSyncStatus('error', e.message);
-  }
+  document.getElementById('cfg-sync-pass').value = '';
+  document.getElementById('sync-info').textContent = '✓ 변경되었습니다';
+  setTimeout(()=>{ document.getElementById('sync-info').textContent=''; }, 2000);
 }
 
-async function initialUpload(){
-  if(!SYNC.enabled){ alert('먼저 동기화 설정을 저장해주세요'); return; }
-  if(!confirm('현재 메모리의 데이터를 시트에 덮어씁니다. 계속하시겠습니까?')) return;
-  await syncPushAll();
-  alert('업로드 완료!');
-  updateSyncInfo();
-}
-
-function disableSync(){
-  if(!confirm('동기화를 해제하면 앱을 사용할 수 없게 됩니다.\n계속하시겠습니까?')) return;
-  SYNC.url=''; SYNC.password=''; SYNC.enabled=false;
+function logoutApp(){
+  if(!confirm('로그아웃하면 비밀번호를 다시 입력해야 합니다.')) return;
+  SYNC.password = ''; SYNC.enabled = false;
   localStorage.removeItem(SYNC_CFG_KEY);
-  setSyncStatus('offline');
-  updateSyncInfo();
-  loadCfg();
+  location.reload();
 }
 
 function refreshActivePage(){
@@ -1593,27 +1584,55 @@ function catTag(c){
     : `<span class="tag-s tag-supply">소모품</span>`;
 }
 
-// ━━━━ INIT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function init(){
-  loadSyncCfg();
+// ━━━━ LOCK SCREEN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function unlock(){
+  const pass = document.getElementById('lock-pass').value.trim();
+  if(!pass) return;
+  const errEl = document.getElementById('lock-error');
+  errEl.style.display = 'none';
+
+  // 임시로 비밀번호 설정해서 ping 테스트
+  SYNC.password = pass;
+  SYNC.enabled = true;
+  try{
+    await apiCall('ping');
+    // 성공 — 비밀번호 저장 후 앱 진입
+    saveSyncCfg();
+    document.getElementById('lockscreen').style.display = 'none';
+    startApp();
+  }catch(e){
+    // 실패 — 비밀번호 초기화
+    SYNC.password = '';
+    SYNC.enabled = false;
+    errEl.style.display = 'block';
+    document.getElementById('lock-pass').value = '';
+    document.getElementById('lock-pass').focus();
+  }
+}
+
+function startApp(){
   document.getElementById('hdate').textContent = new Date().toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
   document.getElementById('u-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('log-month').value = new Date().toISOString().slice(0,7);
   setFilter('all');
+  setSyncStatus('syncing');
+  syncPull(true).then(()=>{
+    setInterval(()=>{ if(SYNC.enabled && document.visibilityState==='visible') syncPull(true); }, 60000);
+  });
+}
+
+// ━━━━ INIT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function init(){
+  loadSyncCfg();
 
   if(SYNC.enabled){
-    setSyncStatus('syncing');
-    syncPull(true).then(()=>{
-      // periodic auto pull every 60s while tab is active
-      setInterval(()=>{ if(SYNC.enabled && document.visibilityState==='visible') syncPull(true); }, 60000);
-    });
+    // 저장된 비밀번호 있음 → 바로 앱 진입 (백그라운드 검증)
+    document.getElementById('lockscreen').style.display = 'none';
+    startApp();
   } else {
-    // 동기화 미설정 → 설정 페이지로 보내고 안내
-    setSyncStatus('offline');
-    go('cfg');
-    setTimeout(()=>{
-      alert('이 앱은 Google Sheets와 연동되어 동작합니다.\n먼저 클라우드 동기화를 설정해주세요.\n\n자세한 방법은 SETUP_GUIDE.md를 참고하세요.');
-    }, 300);
+    // 비밀번호 없음 → 잠금 화면 표시
+    document.getElementById('lockscreen').style.display = 'flex';
+    setTimeout(()=>document.getElementById('lock-pass').focus(), 100);
   }
 }
 
