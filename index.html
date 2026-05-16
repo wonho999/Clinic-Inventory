@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재고 관리</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#111214;
+  --surface:#1a1c1f;
+  --surface2:#222428;
+  --surface3:#2a2d31;
+  --border:#2e3135;
+  --border2:#3a3d42;
+  --text:#e8eaed;
+  --text2:#9aa0a6;
+  --text3:#5f6368;
+  --accent:#4f9cf9;
+  --accent-dim:rgba(79,156,249,.12);
+  --red:#f87171;
+  --red-dim:rgba(248,113,113,.12);
+  --yellow:#fbbf24;
+  --yellow-dim:rgba(251,191,36,.12);
+  --green:#4ade80;
+  --green-dim:rgba(74,222,128,.12);
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans KR',sans-serif;
+  --r:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── HEADER ── */
+header{
+  height:52px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;position:sticky;top:0;z-index:50;
+}
+.hlogo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;letter-spacing:-.2px}
+.hlogo-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.hright{display:flex;align-items:center;gap:8px}
+.hdate{font-family:var(--mono);font-size:11px;color:var(--text3);margin-right:8px}
+
+/* ── BUTTONS ── */
+.btn{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 12px;border-radius:6px;border:none;cursor:pointer;
+  font-family:var(--sans);font-size:12px;font-weight:500;
+  transition:all .12s;white-space:nowrap;
+}
+.btn-primary{background:var(--accent);color:#0d1117}
+.btn-primary:hover{filter:brightness(1.12)}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-outline:hover{background:var(--surface2);color:var(--text)}
+.btn-ghost{background:transparent;color:var(--text3);border:none}
+.btn-ghost:hover{color:var(--text);background:var(--surface2)}
+.btn-red{background:var(--red-dim);color:var(--red);border:1px solid rgba(248,113,113,.2)}
+.btn-red:hover{background:rgba(248,113,113,.22)}
+.btn-sm{padding:3px 8px;font-size:11px;border-radius:4px}
+.btn-icon{padding:5px 8px}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 52px)}
+nav{
+  background:var(--surface);border-right:1px solid var(--border);
+  padding:16px 10px;display:flex;flex-direction:column;gap:2px;
+  position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;
+}
+.nav-label{font-size:9px;font-weight:600;letter-spacing:1.5px;color:var(--text3);
+  text-transform:uppercase;padding:10px 8px 4px}
+.nav-item{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-radius:6px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;
+  transition:all .1s;user-select:none;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.nav-item .ni{font-size:14px;width:18px;text-align:center}
+.nav-badge{
+  margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:500;
+  background:var(--red);color:#0d1117;border-radius:10px;padding:0 5px;min-width:18px;text-align:center;
+}
+main{padding:24px;overflow-y:auto}
+
+/* ── PAGES ── */
+.page{display:none;animation:fadeIn .15s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}}
+.ptitle{font-size:18px;font-weight:600;letter-spacing:-.3px;margin-bottom:2px}
+.psub{color:var(--text2);font-size:12px;margin-bottom:20px}
+
+/* ── KPI ROW ── */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px;display:flex;flex-direction:column;gap:4px;
+}
+.kpi-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
+.kpi-val{font-family:var(--mono);font-size:26px;font-weight:500}
+.kpi-note{font-size:11px;color:var(--text3)}
+.kpi-red .kpi-val{color:var(--red)}
+.kpi-yellow .kpi-val{color:var(--yellow)}
+.kpi-green .kpi-val{color:var(--green)}
+.kpi-accent .kpi-val{color:var(--accent)}
+
+/* ── ALERTS ── */
+.alerts{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.alert{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-radius:var(--r);font-size:13px;border-left:3px solid;
+}
+.alert-red{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+.alert-yellow{background:var(--yellow-dim);border-color:var(--yellow);color:var(--yellow)}
+.alert strong{color:inherit}
+.alert .alert-meta{color:var(--text2);font-size:12px;font-family:var(--mono);margin-left:auto}
+
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+}
+.card-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.card-actions{display:flex;align-items:center;gap:6px}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{
+  background:var(--surface2);padding:8px 14px;
+  text-align:left;font-size:10px;font-weight:600;
+  color:var(--text3);text-transform:uppercase;letter-spacing:.6px;
+  border-bottom:1px solid var(--border);white-space:nowrap;
+}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--surface2)}
+.no-data td{text-align:center;color:var(--text3);padding:36px;font-size:13px}
+
+/* ── STATUS ── */
+.chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);
+}
+.chip::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.chip-red{background:var(--red-dim);color:var(--red)}
+.chip-yellow{background:var(--yellow-dim);color:var(--yellow)}
+.chip-green{background:var(--green-dim);color:var(--green)}
+
+/* ── PROGRESS ── */
+.bar-wrap{display:flex;align-items:center;gap:8px}
+.bar{flex:1;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;min-width:60px}
+.bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.bar-red .bar-fill{background:var(--red)}
+.bar-yellow .bar-fill{background:var(--yellow)}
+.bar-green .bar-fill{background:var(--green)}
+.bar-pct{font-family:var(--mono);font-size:10px;color:var(--text3);width:30px;text-align:right}
+
+/* ── INLINE EDIT ── */
+.editable{
+  cursor:text;border-radius:4px;padding:2px 5px;margin:-2px -5px;
+  transition:background .1s;position:relative;
+}
+.editable:hover{background:var(--surface3)}
+.editable:hover::after{
+  content:'✎';font-size:9px;color:var(--text3);
+  margin-left:4px;vertical-align:middle;
+}
+.cell-editing{
+  background:transparent!important;padding:0!important;
+}
+.cell-editing input,.cell-editing select{
+  padding:3px 7px;font-size:13px;font-family:var(--mono);
+  border-radius:4px;width:100%;min-width:60px;
+  background:var(--surface3);border:1px solid var(--accent);
+  color:var(--text);outline:none;
+}
+.cell-editing select{font-family:var(--sans)}
+.save-flash{animation:flashGreen .5s ease}
+@keyframes flashGreen{0%{background:rgba(74,222,128,.25)}100%{background:transparent}}
+
+/* ── USE FORM ── */
+.use-bar{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px;margin-bottom:16px;
+  display:grid;grid-template-columns:2fr 100px 120px 1fr auto;gap:10px;align-items:end;
+}
+.fgroup{display:flex;flex-direction:column;gap:4px}
+.flabel{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+input,select,textarea{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+  color:var(--text);padding:7px 10px;font-family:var(--sans);font-size:13px;outline:none;
+  transition:border-color .12s;width:100%;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input[readonly]{color:var(--text3);cursor:default}
+select option{background:var(--surface2)}
+
+/* ── MODAL ── */
+.overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:200;align-items:center;justify-content:center;
+}
+.overlay.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);border-radius:12px;
+  padding:24px;width:460px;max-width:95vw;
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  animation:modalIn .16s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(6px)}}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:18px;letter-spacing:-.2px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fgroup-full{grid-column:1/-1}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.hint{font-size:11px;color:var(--text3);margin-top:3px}
+
+/* ── CHART BARS ── */
+.chart-rows{display:flex;flex-direction:column;gap:8px;padding:4px 0}
+.chart-row{display:flex;align-items:center;gap:10px}
+.chart-lbl{width:130px;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-bg{flex:1;height:18px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.chart-fill{height:100%;border-radius:3px;background:var(--accent);opacity:.8;transition:width .4s ease}
+.chart-num{width:54px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--text2)}
+
+/* ── STATS WEEK ── */
+.week-grid{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.week-row{display:flex;align-items:center;gap:10px}
+.week-lbl{width:60px;font-family:var(--mono);font-size:11px;color:var(--text3)}
+.week-bg{flex:1;height:22px;background:var(--surface3);border-radius:4px;overflow:hidden}
+.week-fill{height:100%;border-radius:4px;transition:width .4s ease;display:flex;align-items:center;padding-left:8px;font-family:var(--mono);font-size:10px;color:#0d1117;font-weight:500}
+.week-val{width:54px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--text2)}
+
+/* ── MISC ── */
+.mono{font-family:var(--mono)}
+.cr{color:var(--red)}
+.cy{color:var(--yellow)}
+.cg{color:var(--green)}
+.ca{color:var(--accent)}
+.c2{color:var(--text2)}
+.c3{color:var(--text3)}
+.tag-s{display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:.3px}
+.tag-supply{background:rgba(79,156,249,.15);color:var(--accent)}
+.tag-office{background:rgba(251,191,36,.12);color:var(--yellow)}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.empty{text-align:center;padding:40px;color:var(--text3);font-size:13px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#sync-status:hover{background:var(--surface2)}
+
+/* ══ MOBILE CARD VIEW ═══════════════════════════════════════════ */
+.mobile-cards{display:none;flex-direction:column;gap:10px}
+.mcard{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px;display:flex;flex-direction:column;gap:10px;
+}
+.mcard-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mcard-title{font-size:15px;font-weight:600;letter-spacing:-.2px;line-height:1.3}
+.mcard-memo{font-size:11px;color:var(--text3);margin-top:2px}
+.mcard-actions{display:flex;gap:4px;flex-shrink:0}
+.mcard-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:10px 14px;
+  background:var(--surface2);border-radius:8px;padding:10px 12px;
+}
+.mcard-cell{display:flex;flex-direction:column;gap:2px}
+.mcard-lbl{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+.mcard-val{font-family:var(--mono);font-size:15px;font-weight:500}
+.mcard-val-sm{font-family:var(--mono);font-size:13px}
+.mcard-stock{
+  border:1px solid var(--border2);border-radius:6px;
+  padding:4px 8px;background:var(--surface);cursor:pointer;
+}
+.mcard-stock:hover{border-color:var(--accent)}
+.mcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mcard-bar{flex:1}
+
+/* ══ RESPONSIVE BREAKPOINTS ═══════════════════════════════════════ */
+@media (max-width: 768px){
+  /* Header */
+  header{padding:0 14px;height:54px}
+  .hlogo{font-size:14px}
+  .hlogo-dot{width:7px;height:7px}
+  .hdate{display:none}
+  .hright .btn-outline{display:none}
+  .hright{gap:6px}
+
+  /* Layout: sidebar → bottom tab */
+  .layout{grid-template-columns:1fr;min-height:calc(100vh - 54px)}
+  nav{
+    position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;
+    flex-direction:row;justify-content:space-around;
+    padding:8px 4px;border-right:none;border-top:1px solid var(--border);
+    z-index:90;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom));
+  }
+  .nav-label{display:none}
+  .nav-item{
+    flex-direction:column;gap:3px;padding:6px 8px;flex:1;
+    font-size:10px;text-align:center;justify-content:center;align-items:center;
+    min-height:48px;
+  }
+  .nav-item .ni{font-size:18px;width:auto}
+  .nav-item span:last-child{font-size:10px}
+  .nav-badge{
+    position:absolute;top:2px;right:8px;margin:0;
+    font-size:9px;min-width:16px;padding:0 4px;
+  }
+  main{padding:14px 14px 80px}
+
+  /* Pages */
+  .ptitle{font-size:18px}
+  .psub{font-size:12px;margin-bottom:14px}
+
+  /* KPI: 4 cols → 2 cols, smaller */
+  .kpi-row{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+  .kpi{padding:12px}
+  .kpi-val{font-size:22px}
+  .kpi-note{font-size:10px}
+
+  /* Alerts */
+  .alert{padding:9px 12px;font-size:12px;flex-wrap:wrap}
+  .alert .alert-meta{font-size:11px;width:100%;margin-left:0;margin-top:2px}
+
+  /* Card / table */
+  .card{margin-bottom:12px}
+  .card-head{padding:10px 12px;flex-wrap:wrap;gap:6px}
+  .card-title{font-size:12px}
+
+  /* HIDE table on mobile, SHOW cards */
+  #items-body{display:none}
+  #page-items .tbl-wrap{display:none}
+  #page-items .mobile-cards{display:flex}
+
+  /* Other tables: horizontal scroll with hint */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  th,td{padding:8px 10px;font-size:12px}
+  th{font-size:9px}
+
+  /* Filters/search bar */
+  #page-items > div:first-of-type + div{flex-wrap:wrap;gap:6px}
+  #q-search{width:100%!important;order:5}
+
+  /* Use form: stack vertically */
+  .use-bar{
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .use-bar > div:first-child{grid-column:1/-1}
+  .use-bar > div:nth-child(4){grid-column:1/-1}
+  .use-bar > button{grid-column:1/-1;height:38px}
+
+  /* Modal */
+  .modal{width:100%;max-width:100%;margin:0 12px;padding:20px;border-radius:14px}
+  .form-grid{grid-template-columns:1fr;gap:10px}
+
+  /* Chart bars */
+  .chart-lbl{width:90px;font-size:11px}
+  .chart-num{width:48px;font-size:10px}
+  .week-lbl{width:48px;font-size:10px}
+  .week-val{width:48px;font-size:10px}
+
+  /* Settings */
+  .card[style*="max-width:440px"]{max-width:100%!important}
+
+  /* Touch targets */
+  .btn-sm{padding:5px 10px;font-size:11px;min-height:30px}
+  .btn-icon{padding:7px 10px;min-height:34px;min-width:34px}
+  input,select,textarea{font-size:16px;padding:9px 12px} /* 16px avoids iOS zoom */
+}
+
+@media (max-width: 380px){
+  .kpi-row{grid-template-columns:1fr 1fr;gap:6px}
+  .kpi{padding:10px}
+  .kpi-val{font-size:20px}
+  .nav-item span:last-child{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hlogo">
+    <div class="hlogo-dot"></div>
+    재고 관리
+  </div>
+  <div class="hright">
+    <span class="hdate" id="hdate"></span>
+    <span id="sync-status" style="font-size:11px;color:var(--text3);font-family:var(--mono);cursor:pointer;padding:4px 8px;border-radius:5px" onclick="syncPull()" title="클릭하여 새로고침"></span>
+    <button class="btn btn-primary" onclick="openAdd()">+ 품목 추가</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav>
+    <div class="nav-label">메뉴</div>
+    <div class="nav-item active" onclick="go('dash')" id="ni-dash">
+      <span class="ni">▦</span><span>대시보드</span>
+    </div>
+    <div class="nav-item" onclick="go('items')" id="ni-items">
+      <span class="ni">◫</span><span>재고 현황</span>
+      <span class="nav-badge" id="nb-items" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="go('use')" id="ni-use">
+      <span class="ni">↓</span><span>사용 입력</span>
+    </div>
+    <div class="nav-item" onclick="go('orders')" id="ni-orders">
+      <span class="ni">⊞</span><span>주문 목록</span>
+      <span class="nav-badge" id="nb-orders" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="go('stats')" id="ni-stats">
+      <span class="ni">▷</span><span>통계</span>
+    </div>
+    <div class="nav-label">설정</div>
+    <div class="nav-item" onclick="go('cfg')" id="ni-cfg">
+      <span class="ni">⚙</span><span>설정</span>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ══ DASHBOARD ══ -->
+    <div class="page active" id="page-dash">
+      <div class="ptitle">대시보드</div>
+      <div class="psub" id="dash-sub"></div>
+
+      <div id="alert-area" class="alerts"></div>
+
+      <div class="kpi-row">
+        <div class="kpi kpi-accent"><div class="kpi-label">전체 품목</div><div class="kpi-val" id="kv-total">0</div><div class="kpi-note">등록된 품목</div></div>
+        <div class="kpi kpi-red"><div class="kpi-label">주문 필요</div><div class="kpi-val" id="kv-red">0</div><div class="kpi-note">N주치 미만</div></div>
+        <div class="kpi kpi-yellow"><div class="kpi-label">주의</div><div class="kpi-val" id="kv-yellow">0</div><div class="kpi-note">곧 부족 예상</div></div>
+        <div class="kpi kpi-green"><div class="kpi-label">정상</div><div class="kpi-val" id="kv-green">0</div><div class="kpi-note">충분한 재고</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">🚨 주문 필요 품목</span></div>
+        <div class="tbl-wrap">
+          <table><thead><tr>
+            <th>품목</th><th>분류</th><th>현재 재고</th><th>주간 사용</th><th>잔여 주수</th><th>알림 기준</th>
+          </tr></thead>
+          <tbody id="dash-order-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">📊 최근 4주 사용 TOP 5</span></div>
+        <div style="padding:16px" id="dash-chart"></div>
+      </div>
+    </div>
+
+    <!-- ══ ITEMS ══ -->
+    <div class="page" id="page-items">
+      <div class="ptitle">재고 현황</div>
+      <div class="psub">품목별 재고 수량과 소진 예측을 확인합니다.</div>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+        <button class="btn btn-outline btn-sm" onclick="setFilter('all')" id="f-all">전체</button>
+        <button class="btn btn-outline btn-sm" onclick="setFilter('supply')" id="f-supply">소모품</button>
+        <button class="btn btn-outline btn-sm" onclick="setFilter('office')" id="f-office">사무용품</button>
+        <input type="text" id="q-search" placeholder="검색..." style="width:160px;padding:5px 10px;font-size:12px" oninput="renderItems()">
+        <span class="c3 mono" style="font-size:11px;margin-left:auto" id="item-count"></span>
+      </div>
+
+      <div class="card">
+        <div class="tbl-wrap">
+          <table><thead><tr>
+            <th>품목명</th><th>분류</th><th>단위</th>
+            <th>현재 재고 <span style="font-weight:400;opacity:.5;font-size:9px">클릭 = 수정</span></th>
+            <th>알림 기준 (주)</th><th>주간 사용량</th>
+            <th>잔여 주수</th><th>재고율</th><th>상태</th><th></th>
+          </tr></thead>
+          <tbody id="items-body"></tbody>
+          </table>
+        </div>
+        <div class="mobile-cards" id="items-mobile" style="padding:10px"></div>
+      </div>
+    </div>
+
+    <!-- ══ USE INPUT ══ -->
+    <div class="page" id="page-use">
+      <div class="ptitle">사용량 입력</div>
+      <div class="psub">사용한 수량을 기록하면 재고가 자동 차감됩니다.</div>
+
+      <div class="use-bar">
+        <div class="fgroup">
+          <div class="flabel">품목</div>
+          <select id="u-item"></select>
+        </div>
+        <div class="fgroup">
+          <div class="flabel">사용량</div>
+          <input type="number" id="u-qty" min="1" value="1" placeholder="수량">
+        </div>
+        <div class="fgroup">
+          <div class="flabel">날짜</div>
+          <input type="date" id="u-date">
+        </div>
+        <div class="fgroup" style="grid-column:4">
+          <div class="flabel">메모</div>
+          <input type="text" id="u-memo" placeholder="선택사항">
+        </div>
+        <button class="btn btn-primary" style="height:34px;align-self:end" onclick="addLog()">기록</button>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">사용 기록</span>
+          <div class="card-actions">
+            <input type="month" id="log-month" onchange="renderLogs()" style="font-size:12px;padding:4px 8px">
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('log-month').value='';renderLogs()">전체</button>
+          </div>
+        </div>
+        <div class="tbl-wrap" style="max-height:420px;overflow-y:auto">
+          <table><thead><tr><th>날짜</th><th>품목</th><th>사용량</th><th>메모</th><th></th></tr></thead>
+          <tbody id="log-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ORDERS ══ -->
+    <div class="page" id="page-orders">
+      <div class="ptitle">주문 목록</div>
+      <div class="psub">주문이 필요한 품목과 입고 내역을 관리합니다.</div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">주문 필요</span>
+          <button class="btn btn-outline btn-sm" onclick="copyOrder()">📋 주문서 복사</button>
+        </div>
+        <div class="tbl-wrap">
+          <table><thead><tr>
+            <th>품목</th><th>분류</th><th>현재 재고</th><th>주간 사용</th><th>잔여 주수</th><th>권장 주문량</th><th>단위</th><th></th>
+          </tr></thead>
+          <tbody id="order-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">입고 기록</span></div>
+        <div class="tbl-wrap">
+          <table><thead><tr><th>날짜</th><th>품목</th><th>입고량</th><th>단위</th></tr></thead>
+          <tbody id="receive-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ STATS ══ -->
+    <div class="page" id="page-stats">
+      <div class="ptitle">통계</div>
+      <div class="psub">품목별 사용 추이를 분석합니다.</div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">주간 사용 추이</span>
+          <select id="stats-sel" onchange="renderStats()" style="font-size:12px;padding:4px 10px;width:200px">
+            <option value="">— 품목 선택 —</option>
+          </select>
+        </div>
+        <div style="padding:16px" id="stats-chart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">월간 소비 요약</span></div>
+        <div class="tbl-wrap">
+          <table><thead><tr>
+            <th>품목</th><th>이번 달</th><th>지난 달</th><th>4주 합계</th><th>주간 평균</th><th>주간 입력값</th><th>사용 기준</th><th>추이</th>
+          </tr></thead>
+          <tbody id="stats-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SETTINGS ══ -->
+    <div class="page" id="page-cfg">
+      <div class="ptitle">설정</div>
+      <div class="psub">기본 설정과 권장 주문량 기준을 관리합니다.</div>
+
+      <div class="card" style="max-width:440px">
+        <div class="card-head"><span class="card-title">기본값</span></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+          <div class="fgroup">
+            <div class="flabel">신규 품목 기본 알림 기준 (주)</div>
+            <input type="number" id="cfg-weeks" min="1" max="12" value="2">
+            <div class="hint">품목 추가 시 기본으로 설정되는 알림 기준 주수입니다.</div>
+          </div>
+          <div class="fgroup">
+            <div class="flabel">권장 주문량 = 주간 평균 × N주</div>
+            <input type="number" id="cfg-order-weeks" min="1" max="16" value="4">
+            <div class="hint">주문 목록에서 자동 계산되는 권장 주문량 기준입니다.</div>
+          </div>
+          <button class="btn btn-primary" style="align-self:flex-start" onclick="saveCfg()">저장</button>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:440px;margin-top:12px">
+        <div class="card-head"><span class="card-title">🔄 클라우드 동기화 (Google Sheets)</span></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+          <div class="hint" style="background:var(--surface2);padding:10px 12px;border-radius:6px;border-left:3px solid var(--accent)">
+            ⓘ 이 앱은 Google Sheets를 데이터베이스로 사용합니다. 모든 데이터는 시트에 저장되며, 새로고침 시마다 시트에서 불러옵니다.
+          </div>
+          <div class="fgroup">
+            <div class="flabel">Apps Script Web App URL *</div>
+            <input type="text" id="cfg-sync-url" placeholder="https://script.google.com/macros/s/..../exec">
+            <div class="hint">Google Apps Script에서 배포한 웹 앱 URL</div>
+          </div>
+          <div class="fgroup">
+            <div class="flabel">비밀번호 *</div>
+            <input type="text" id="cfg-sync-pass" placeholder="Apps Script 코드의 PASSWORD와 같은 값">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="testSync()">연결 테스트</button>
+            <button class="btn btn-primary" onclick="saveSyncSettings()">저장 + 연결</button>
+            <button class="btn btn-outline" onclick="disableSync()">연결 해제</button>
+          </div>
+          <div class="hint" id="sync-info" style="margin-top:4px"></div>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:440px;margin-top:12px">
+        <div class="card-head"><span class="card-title">데이터</span></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+          <p class="c3" style="font-size:12px">모든 재고·사용 기록을 초기화합니다. 복구 불가합니다.</p>
+          <button class="btn btn-red" style="align-self:flex-start" onclick="resetAll()">전체 초기화</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══ MODAL: 품목 추가/수정 ══ -->
+<div class="overlay" id="m-item">
+  <div class="modal">
+    <div class="modal-title" id="m-item-title">품목 추가</div>
+    <div class="form-grid">
+      <div class="fgroup fgroup-full">
+        <div class="flabel">품목명 *</div>
+        <input type="text" id="fi-name" placeholder="예: 종이컵 (큰컵)">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">분류</div>
+        <select id="fi-cat">
+          <option value="supply">소모품</option>
+          <option value="office">사무용품</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">단위</div>
+        <input type="text" id="fi-unit" placeholder="개, 박스, 롤…">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">현재 재고 *</div>
+        <input type="number" id="fi-stock" min="0" placeholder="0">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">알림 기준 (주) *</div>
+        <input type="number" id="fi-weeks" min="1" max="52" placeholder="2">
+        <div class="hint">재고가 N주치 이하가 되면 알림</div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">주간 사용량 (직접 입력)</div>
+        <input type="number" id="fi-weekly" min="0" placeholder="기록 없을 때 사용">
+        <div class="hint">사용 기록이 쌓이면 자동 계산됩니다</div>
+      </div>
+      <div class="fgroup fgroup-full">
+        <div class="flabel">메모</div>
+        <input type="text" id="fi-memo" placeholder="공급업체, 규격 등">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeM('m-item')">취소</button>
+      <button class="btn btn-primary" onclick="saveItem()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: 입고 처리 ══ -->
+<div class="overlay" id="m-receive">
+  <div class="modal" style="width:340px">
+    <div class="modal-title">입고 처리</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="fgroup">
+        <div class="flabel">품목</div>
+        <input type="text" id="ri-name" readonly>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">입고 수량 *</div>
+        <input type="number" id="ri-qty" min="1">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">날짜</div>
+        <input type="date" id="ri-date">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeM('m-receive')">취소</button>
+      <button class="btn btn-primary" onclick="doReceive()">입고 완료</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ━━━━ STATE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const KEY = 'clinv3';
+const SYNC_CFG_KEY = 'clinv3_sync_cfg';
+
+let S = {
+  items: [],
+  logs: [],
+  receives: [],
+  cfg: { defaultWeeks: 2, orderWeeks: 4 }
+};
+let editId = null;
+let receiveId = null;
+let itemFilter = 'all';
+
+// ━━━━ SYNC MODULE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let SYNC = {
+  url: '',           // Google Apps Script Web App URL
+  password: '',      // shared password
+  enabled: false,    // true when configured
+  status: 'offline', // offline | syncing | synced | error
+  lastSync: null,
+  queue: [],         // pending operations
+  pushTimer: null,
+};
+
+function loadSyncCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem(SYNC_CFG_KEY));
+    if(c){ SYNC.url = c.url||''; SYNC.password = c.password||''; SYNC.enabled = !!(c.url && c.password); }
+  }catch(e){}
+}
+function saveSyncCfg(){
+  localStorage.setItem(SYNC_CFG_KEY, JSON.stringify({url:SYNC.url, password:SYNC.password}));
+}
+
+function setSyncStatus(s, note){
+  SYNC.status = s;
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  const map = {
+    offline: {dot:'#5f6368', text:'오프라인'},
+    syncing: {dot:'#fbbf24', text:'동기화 중...'},
+    synced:  {dot:'#4ade80', text:note || '동기화됨'},
+    error:   {dot:'#f87171', text:note || '오류'}
+  };
+  const m = map[s];
+  el.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${m.dot};margin-right:5px;${s==='syncing'?'animation:pulse 1s infinite':''}"></span>${m.text}`;
+}
+
+async function apiCall(action, body={}){
+  if(!SYNC.enabled) throw new Error('not configured');
+  const payload = { action, pass: SYNC.password, ...body };
+  const res = await fetch(SYNC.url, {
+    method: 'POST',
+    // Apps Script doesn't accept application/json with CORS preflight, use text/plain
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload),
+    redirect: 'follow'
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || 'api error');
+  return data.data;
+}
+
+// Pull from sheet → replace session state
+async function syncPull(silent=false){
+  if(!SYNC.enabled) return;
+  // Don't interrupt an inline cell edit in progress
+  if(document.querySelector('.cell-editing')) return;
+  if(!silent) setSyncStatus('syncing');
+  try{
+    const remote = await apiCall('pull');
+    S.items    = remote.items || [];
+    S.logs     = remote.logs || [];
+    S.receives = remote.receives || [];
+    if(remote.cfg) S.cfg = {...S.cfg, ...remote.cfg};
+    SYNC.lastSync = new Date();
+    setSyncStatus('synced', '방금 동기화');
+    refreshActivePage();
+  }catch(e){
+    setSyncStatus('error', e.message);
+    console.error('pull error:', e);
+  }
+}
+
+// Push local data fully (used for initial upload)
+async function syncPushAll(){
+  if(!SYNC.enabled) return;
+  setSyncStatus('syncing');
+  try{
+    await apiCall('push', { data: S });
+    SYNC.lastSync = new Date();
+    setSyncStatus('synced', '업로드 완료');
+  }catch(e){
+    setSyncStatus('error', e.message);
+    console.error('push error:', e);
+  }
+}
+
+// Queue an incremental change (called from persist via specific actions)
+function queueSync(action, body){
+  if(!SYNC.enabled) return;
+  SYNC.queue.push({action, body});
+  scheduleFlush();
+}
+
+function scheduleFlush(){
+  if(SYNC.pushTimer) clearTimeout(SYNC.pushTimer);
+  SYNC.pushTimer = setTimeout(flushQueue, 800); // debounce
+}
+
+let isFlushing = false;
+
+async function flushQueue(){
+  if(!SYNC.enabled || SYNC.queue.length === 0 || isFlushing) return;
+  isFlushing = true;
+  setSyncStatus('syncing');
+  const batch = SYNC.queue.splice(0, SYNC.queue.length);
+  try{
+    for(const op of batch){
+      await apiCall(op.action, op.body);
+    }
+    SYNC.lastSync = new Date();
+    setSyncStatus('synced', '저장됨');
+  }catch(e){
+    setSyncStatus('error', '재시도 중...');
+    SYNC.queue.unshift(...batch);
+    console.error('sync error:', e);
+    setTimeout(()=>{ if(SYNC.queue.length) flushQueue(); }, 5000);
+  } finally {
+    isFlushing = false;
+  }
+}
+
+// 세션 메모리만 사용 — localStorage 영구 저장 안 함
+// 새로고침 시 항상 시트에서 풀해서 단일 진실 원천 유지
+function load(){ /* no-op: data comes from sheet on init */ }
+function persist(){ /* no-op: don't save app data to localStorage */ }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+// ━━━━ COMPUTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function logAvg(itemId, weeks=4){
+  const cut = new Date(Date.now() - weeks*7*864e5);
+  const logs = S.logs.filter(l => l.itemId===itemId && new Date(l.date)>=cut);
+  return logs.reduce((s,l)=>s+l.qty, 0) / weeks;
+}
+
+function getWeekly(item){
+  // Use log average if we have enough history (≥3 records in 4w)
+  const cut = new Date(Date.now() - 28*864e5);
+  const cnt = S.logs.filter(l=>l.itemId===item.id && new Date(l.date)>=cut).length;
+  if(cnt >= 3) return +logAvg(item.id, 4).toFixed(2);
+  return item.manualWeekly || 0;
+}
+
+function weeksLeft(item){
+  const w = getWeekly(item);
+  if(!w) return null;
+  return +(item.stock / w).toFixed(1);
+}
+
+function status(item){
+  const wl = weeksLeft(item);
+  if(wl === null) return 'unknown';
+  if(wl <= item.alertWeeks) return 'red';
+  if(wl <= item.alertWeeks * 2) return 'yellow';
+  return 'green';
+}
+
+function recommended(item){
+  const w = getWeekly(item);
+  if(!w) return item.stock * 2;
+  return Math.max(0, Math.ceil(w * S.cfg.orderWeeks - item.stock));
+}
+
+// ━━━━ NAVIGATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function go(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('ni-'+page).classList.add('active');
+  const renders = {
+    dash: renderDash,
+    items: renderItems,
+    use: ()=>{ fillUseSelect(); renderLogs(); },
+    orders: renderOrders,
+    stats: ()=>{ fillStatsSelect(); renderStats(); renderStatsSummary(); },
+    cfg: loadCfg
+  };
+  renders[page]?.();
+}
+
+// ━━━━ DASHBOARD ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderDash(){
+  document.getElementById('dash-sub').textContent =
+    new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+  const counts = {red:0, yellow:0, green:0, unknown:0};
+  S.items.forEach(i => counts[status(i)]++);
+
+  document.getElementById('kv-total').textContent = S.items.length;
+  document.getElementById('kv-red').textContent = counts.red;
+  document.getElementById('kv-yellow').textContent = counts.yellow;
+  document.getElementById('kv-green').textContent = counts.green + counts.unknown;
+
+  // badges
+  const nb = document.getElementById('nb-items');
+  nb.style.display = counts.red ? 'inline' : 'none';
+  nb.textContent = counts.red;
+  const ob = document.getElementById('nb-orders');
+  ob.style.display = counts.red ? 'inline' : 'none';
+  ob.textContent = counts.red;
+
+  // alerts
+  const area = document.getElementById('alert-area');
+  area.innerHTML = '';
+  S.items.filter(i=>status(i)==='red').forEach(i=>{
+    const wl = weeksLeft(i);
+    area.innerHTML += `<div class="alert alert-red">
+      🚨 <strong>${i.name}</strong> — 재고 부족
+      <span class="alert-meta">${i.stock}${i.unit} / 잔여 ${wl!==null?wl+'주':'?'} (기준: ${i.alertWeeks}주)</span>
+    </div>`;
+  });
+  S.items.filter(i=>status(i)==='yellow').forEach(i=>{
+    const wl = weeksLeft(i);
+    area.innerHTML += `<div class="alert alert-yellow">
+      ⚠️ <strong>${i.name}</strong> — 곧 부족 예상
+      <span class="alert-meta">${i.stock}${i.unit} / 잔여 ${wl!==null?wl+'주':'?'}</span>
+    </div>`;
+  });
+
+  // order table
+  const rb = document.getElementById('dash-order-body');
+  const reds = S.items.filter(i=>status(i)==='red');
+  if(!reds.length){ rb.innerHTML=`<tr class="no-data"><td colspan="6">주문 필요 품목 없음 ✓</td></tr>`; }
+  else rb.innerHTML = reds.map(i=>{
+    const wl = weeksLeft(i);
+    const w = getWeekly(i);
+    return `<tr>
+      <td><strong>${i.name}</strong></td>
+      <td>${catTag(i.cat)}</td>
+      <td class="mono cr">${i.stock} ${i.unit}</td>
+      <td class="mono">${w?w+' '+i.unit+'/주':'—'}</td>
+      <td class="mono cr">${wl!==null?wl+'주':'—'}</td>
+      <td class="mono cy">${i.alertWeeks}주</td>
+    </tr>`;
+  }).join('');
+
+  // chart
+  const cut4 = new Date(Date.now()-28*864e5);
+  const top5 = S.items.map(i=>{
+    const t = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=cut4).reduce((s,l)=>s+l.qty,0);
+    return {name:i.name, unit:i.unit, total:t};
+  }).filter(d=>d.total>0).sort((a,b)=>b.total-a.total).slice(0,5);
+
+  const chart = document.getElementById('dash-chart');
+  if(!top5.length){ chart.innerHTML='<div class="empty">사용 기록이 없습니다</div>'; return; }
+  const mx = top5[0].total;
+  chart.innerHTML = `<div class="chart-rows">${top5.map(d=>`
+    <div class="chart-row">
+      <div class="chart-lbl" title="${d.name}">${d.name}</div>
+      <div class="chart-bg"><div class="chart-fill" style="width:${(d.total/mx*100).toFixed(1)}%"></div></div>
+      <div class="chart-num">${d.total} ${d.unit}</div>
+    </div>`).join('')}</div>`;
+}
+
+// ━━━━ ITEMS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setFilter(f){
+  itemFilter = f;
+  ['all','supply','office'].forEach(x=>{
+    document.getElementById('f-'+x).className = 'btn btn-sm ' + (f===x ? 'btn-primary' : 'btn-outline');
+  });
+  renderItems();
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderItems(){
+  const q = (document.getElementById('q-search')?.value||'').toLowerCase();
+  const list = S.items.filter(i =>
+    (itemFilter==='all'||i.cat===itemFilter) &&
+    (!q || i.name.toLowerCase().includes(q))
+  );
+  document.getElementById('item-count').textContent = list.length + '개';
+
+  // Desktop table
+  const tb = document.getElementById('items-body');
+  if(!list.length){
+    tb.innerHTML=`<tr class="no-data"><td colspan="10">품목 없음</td></tr>`;
+  } else {
+    tb.innerHTML = list.map(i => itemRow(i)).join('');
+  }
+
+  // Mobile card view
+  const mc = document.getElementById('items-mobile');
+  if(mc){
+    if(!list.length){
+      mc.innerHTML = `<div class="empty">품목 없음</div>`;
+    } else {
+      mc.innerHTML = list.map(i => itemCard(i)).join('');
+    }
+  }
+}
+
+function itemCard(i){
+  const st = status(i);
+  const wl = weeksLeft(i);
+  const w  = getWeekly(i);
+  const ratio = wl !== null ? Math.min(wl / (i.alertWeeks * 2) * 100, 100) : 50;
+  const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
+  const logCnt = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=new Date(Date.now()-28*864e5)).length;
+  const weeklyLabel = logCnt >= 3
+    ? `${w} ${i.unit} <span class="c3" style="font-size:9px">(자동)</span>`
+    : i.manualWeekly ? `${i.manualWeekly} ${i.unit} <span class="c3" style="font-size:9px">(수동)</span>`
+    : '<span class="c3">—</span>';
+  const stockColor = st==='red'?'cr':st==='yellow'?'cy':'';
+
+  return `<div class="mcard" id="mcard-${i.id}">
+    <div class="mcard-head">
+      <div style="flex:1;min-width:0">
+        <div class="mcard-title">${esc(i.name)}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          ${catTag(i.cat)}
+          ${chip(st)}
+        </div>
+        ${i.memo?`<div class="mcard-memo">${esc(i.memo)}</div>`:''}
+      </div>
+      <div class="mcard-actions">
+        <button class="btn btn-ghost btn-sm btn-icon" title="수정" onclick="openEdit('${i.id}')">✏</button>
+        <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--red)" title="삭제" onclick="delItem('${i.id}')">✕</button>
+      </div>
+    </div>
+
+    <div class="mcard-grid">
+      <div class="mcard-cell">
+        <div class="mcard-lbl">현재 재고</div>
+        <div id="mstock-${i.id}"
+             class="mcard-val mcard-stock ${stockColor}"
+             onclick="inlineStockMobile('${i.id}', this)">
+          ${i.stock} <span class="c3" style="font-size:11px">${esc(i.unit)}</span>
+        </div>
+      </div>
+      <div class="mcard-cell">
+        <div class="mcard-lbl">알림 기준</div>
+        <div class="mcard-val ca">${i.alertWeeks}주</div>
+      </div>
+      <div class="mcard-cell">
+        <div class="mcard-lbl">주간 사용량</div>
+        <div class="mcard-val-sm">${weeklyLabel}</div>
+      </div>
+      <div class="mcard-cell">
+        <div class="mcard-lbl">잔여 주수</div>
+        <div id="mwl-${i.id}" class="mcard-val ${st==='red'?'cr':st==='yellow'?'cy':'cg'}">${wl!==null?wl+'주':'—'}</div>
+      </div>
+    </div>
+
+    <div class="mcard-foot">
+      <div class="mcard-bar bar-wrap ${barCls}" id="mbar-${i.id}">
+        <div class="bar"><div class="bar-fill" style="width:${ratio.toFixed(0)}%"></div></div>
+        <span class="bar-pct">${ratio.toFixed(0)}%</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// 모바일에서 재고 인라인 편집
+function inlineStockMobile(itemId, el){
+  if(el.classList.contains('cell-editing')) return;
+  const item = S.items.find(i=>i.id===itemId);
+  const prev = item.stock;
+  el.classList.add('cell-editing');
+
+  const inp = document.createElement('input');
+  inp.type='number'; inp.inputMode='decimal'; inp.min=0; inp.step='any';
+  inp.value = prev;
+  inp.style.cssText='width:100%;font-size:16px;font-family:var(--mono);text-align:center;padding:6px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--surface3);color:var(--text);outline:none';
+  el.innerHTML=''; el.appendChild(inp);
+  inp.focus(); inp.select();
+
+  const commit = ()=>{
+    const v = parseFloat(inp.value);
+    item.stock = isNaN(v) ? prev : Math.max(0, v);
+    persist();
+    queueSync('updItem', { item });
+    el.classList.remove('cell-editing');
+    refreshMobileCard(itemId);
+    renderDash();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); commit(); }
+    if(e.key==='Escape'){ el.classList.remove('cell-editing'); refreshMobileCard(itemId); }
+  });
+}
+
+function refreshMobileCard(itemId){
+  const item = S.items.find(i=>i.id===itemId); if(!item) return;
+  const st = status(item);
+  const wl = weeksLeft(item);
+  const ratio = wl !== null ? Math.min(wl / (item.alertWeeks*2) * 100, 100) : 50;
+  const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
+  const stockEl = document.getElementById('mstock-'+itemId);
+  if(stockEl){
+    stockEl.className = `mcard-val mcard-stock ${st==='red'?'cr':st==='yellow'?'cy':''}`;
+    stockEl.innerHTML = `${item.stock} <span class="c3" style="font-size:11px">${esc(item.unit)}</span>`;
+    stockEl.setAttribute('onclick',`inlineStockMobile('${itemId}', this)`);
+    stockEl.classList.add('save-flash');
+    setTimeout(()=>stockEl.classList.remove('save-flash'), 500);
+  }
+  const wlEl = document.getElementById('mwl-'+itemId);
+  if(wlEl){ wlEl.className=`mcard-val ${st==='red'?'cr':st==='yellow'?'cy':'cg'}`; wlEl.textContent=wl!==null?wl+'주':'—'; }
+  const barEl = document.getElementById('mbar-'+itemId);
+  if(barEl){
+    barEl.className = `mcard-bar bar-wrap ${barCls}`;
+    barEl.innerHTML = `<div class="bar"><div class="bar-fill" style="width:${ratio.toFixed(0)}%"></div></div><span class="bar-pct">${ratio.toFixed(0)}%</span>`;
+  }
+}
+
+function itemRow(i){
+  const st = status(i);
+  const wl = weeksLeft(i);
+  const w  = getWeekly(i);
+  const ratio = wl !== null ? Math.min(wl / (i.alertWeeks * 2) * 100, 100) : 50;
+  const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
+  const logCnt = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=new Date(Date.now()-28*864e5)).length;
+  const weeklyLabel = logCnt >= 3
+    ? `<span class="mono">${w} ${i.unit} <span class="c3" style="font-size:10px">(자동)</span></span>`
+    : i.manualWeekly
+      ? `<span class="mono">${i.manualWeekly} ${i.unit} <span class="c3" style="font-size:10px">(수동)</span></span>`
+      : `<span class="c3">—</span>`;
+
+  return `<tr id="row-${i.id}">
+    <td>
+      <strong>${esc(i.name)}</strong>
+      ${i.memo ? `<br><span class="c3" style="font-size:11px">${esc(i.memo)}</span>` : ''}
+    </td>
+    <td>${catTag(i.cat)}</td>
+    <td class="c3 mono">${esc(i.unit)}</td>
+    <td id="stock-cell-${i.id}"
+        class="mono editable ${st==='red'?'cr':st==='yellow'?'cy':''}"
+        title="클릭하여 재고 수량 수정"
+        onclick="inlineStock('${i.id}', this)">
+      ${i.stock}
+    </td>
+    <td class="mono ca">${i.alertWeeks}주</td>
+    <td>${weeklyLabel}</td>
+    <td id="wl-${i.id}" class="mono ${st==='red'?'cr':st==='yellow'?'cy':'cg'}">${wl!==null?wl+'주':'—'}</td>
+    <td style="min-width:110px" id="bar-${i.id}">
+      <div class="bar-wrap ${barCls}">
+        <div class="bar"><div class="bar-fill" style="width:${ratio.toFixed(0)}%"></div></div>
+        <span class="bar-pct">${ratio.toFixed(0)}%</span>
+      </div>
+    </td>
+    <td id="chip-${i.id}">${chip(st)}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-ghost btn-sm btn-icon" title="수정" onclick="openEdit('${i.id}')">✏</button>
+      <button class="btn btn-ghost btn-sm btn-icon" title="삭제" style="color:var(--red)" onclick="delItem('${i.id}')">✕</button>
+    </td>
+  </tr>`;
+}
+
+// ── 재고 인라인 편집 (stock only) ───────────────────────────────
+function inlineStock(itemId, cell){
+  if(cell.classList.contains('cell-editing')) return;
+  const item = S.items.find(i=>i.id===itemId);
+  const prev = item.stock;
+
+  cell.classList.add('cell-editing');
+  const inp = document.createElement('input');
+  inp.type='number'; inp.min=0; inp.step='any';
+  inp.value = prev;
+  inp.style.cssText='width:72px;font-size:13px;font-family:var(--mono)';
+  cell.innerHTML=''; cell.appendChild(inp);
+  inp.focus(); inp.select();
+
+  const commit = ()=>{
+    const v = parseFloat(inp.value);
+    item.stock = isNaN(v) ? prev : Math.max(0, v);
+    persist();
+    queueSync('updItem', { item });
+    cell.classList.remove('cell-editing');
+    refreshRow(itemId);
+    renderDash();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); commit(); }
+    if(e.key==='Escape'){
+      cell.classList.remove('cell-editing');
+      refreshRow(itemId);
+    }
+  });
+}
+
+function refreshRow(itemId){
+  const item = S.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const st  = status(item);
+  const wl  = weeksLeft(item);
+  const ratio = wl !== null ? Math.min(wl / (item.alertWeeks*2) * 100, 100) : 50;
+  const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
+
+  const stockCell = document.getElementById('stock-cell-'+itemId);
+  if(stockCell){
+    stockCell.className = `mono editable ${st==='red'?'cr':st==='yellow'?'cy':''}`;
+    stockCell.textContent = item.stock;
+  }
+  const wlEl = document.getElementById('wl-'+itemId);
+  if(wlEl){ wlEl.className=`mono ${st==='red'?'cr':st==='yellow'?'cy':'cg'}`; wlEl.textContent=wl!==null?wl+'주':'—'; }
+  const barEl = document.getElementById('bar-'+itemId);
+  if(barEl) barEl.innerHTML=`<div class="bar-wrap ${barCls}"><div class="bar"><div class="bar-fill" style="width:${ratio.toFixed(0)}%"></div></div><span class="bar-pct">${ratio.toFixed(0)}%</span></div>`;
+  const chipEl = document.getElementById('chip-'+itemId);
+  if(chipEl) chipEl.innerHTML=chip(st);
+  // flash
+  stockCell?.classList.add('save-flash');
+  setTimeout(()=>stockCell?.classList.remove('save-flash'), 500);
+
+  // also refresh mobile card if present
+  refreshMobileCard(itemId);
+}
+
+// ━━━━ ITEM MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openAdd(){
+  editId = null;
+  document.getElementById('m-item-title').textContent = '품목 추가';
+  ['fi-name','fi-unit','fi-memo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fi-stock').value='';
+  document.getElementById('fi-weeks').value=S.cfg.defaultWeeks;
+  document.getElementById('fi-weekly').value='';
+  document.getElementById('fi-cat').value='supply';
+  openM('m-item');
+}
+
+function openEdit(id){
+  editId = id;
+  const item = S.items.find(i=>i.id===id);
+  document.getElementById('m-item-title').textContent = '품목 수정';
+  document.getElementById('fi-name').value = item.name;
+  document.getElementById('fi-cat').value = item.cat;
+  document.getElementById('fi-unit').value = item.unit;
+  document.getElementById('fi-stock').value = item.stock;
+  document.getElementById('fi-weeks').value = item.alertWeeks;
+  document.getElementById('fi-weekly').value = item.manualWeekly||'';
+  document.getElementById('fi-memo').value = item.memo||'';
+  openM('m-item');
+}
+
+function saveItem(){
+  const name = document.getElementById('fi-name').value.trim();
+  const stock = parseFloat(document.getElementById('fi-stock').value);
+  const alertWeeks = parseInt(document.getElementById('fi-weeks').value);
+  if(!name||isNaN(stock)||isNaN(alertWeeks)){ alert('필수 항목을 입력하세요'); return; }
+  const data = {
+    name, stock, alertWeeks,
+    cat: document.getElementById('fi-cat').value,
+    unit: document.getElementById('fi-unit').value.trim()||'개',
+    manualWeekly: parseFloat(document.getElementById('fi-weekly').value)||0,
+    memo: document.getElementById('fi-memo').value.trim()
+  };
+  let saved;
+  if(editId){
+    saved = Object.assign(S.items.find(i=>i.id===editId), data);
+    queueSync('updItem', { item: saved });
+  } else {
+    saved = {id:uid(), ...data};
+    S.items.push(saved);
+    queueSync('addItem', { item: saved });
+  }
+  persist(); closeM('m-item');
+  renderItems(); renderDash();
+}
+
+function delItem(id){
+  if(!confirm('삭제하시겠습니까?')) return;
+  S.items = S.items.filter(i=>i.id!==id);
+  S.logs = S.logs.filter(l=>l.itemId!==id);
+  queueSync('delItem', { id });
+  persist(); renderItems(); renderDash();
+}
+
+// ━━━━ USE LOG ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function fillUseSelect(){
+  const sel = document.getElementById('u-item');
+  sel.innerHTML = '<option value="">— 품목 선택 —</option>' +
+    S.items.map(i=>`<option value="${i.id}">${i.name} (현재: ${i.stock}${i.unit})</option>`).join('');
+}
+
+function addLog(){
+  const itemId = document.getElementById('u-item').value;
+  const qty = parseFloat(document.getElementById('u-qty').value);
+  const date = document.getElementById('u-date').value;
+  const memo = document.getElementById('u-memo').value.trim();
+  if(!itemId||!qty||!date){ alert('품목·수량·날짜를 입력하세요'); return; }
+  const item = S.items.find(i=>i.id===itemId);
+  if(item.stock < qty && !confirm(`재고(${item.stock}${item.unit})보다 많습니다. 계속?`)) return;
+  const log = {id:uid(), itemId, qty, date, memo};
+  S.logs.push(log);
+  item.stock = Math.max(0, item.stock - qty);
+  queueSync('addLog', { log }); // backend will decrement stock too
+  persist();
+  document.getElementById('u-qty').value = 1;
+  document.getElementById('u-memo').value = '';
+  fillUseSelect();
+  renderLogs();
+  renderDash();
+}
+
+function renderLogs(){
+  const m = document.getElementById('log-month')?.value;
+  let logs = [...S.logs].sort((a,b)=>b.date.localeCompare(a.date));
+  if(m) logs = logs.filter(l=>l.date.startsWith(m));
+  const tb = document.getElementById('log-body');
+  if(!logs.length){ tb.innerHTML=`<tr class="no-data"><td colspan="5">기록 없음</td></tr>`; return; }
+  tb.innerHTML = logs.map(l=>{
+    const item = S.items.find(i=>i.id===l.itemId);
+    return `<tr>
+      <td class="mono c2">${l.date}</td>
+      <td>${item?item.name:'(삭제)'}</td>
+      <td class="mono">${l.qty} ${item?.unit||''}</td>
+      <td class="c3" style="font-size:12px">${l.memo||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="delLog('${l.id}')">삭제</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function delLog(id){
+  const l = S.logs.find(x=>x.id===id);
+  if(!l||!confirm('삭제하면 재고가 복구됩니다.')) return;
+  const item = S.items.find(i=>i.id===l.itemId);
+  if(item) item.stock += l.qty;
+  S.logs = S.logs.filter(x=>x.id!==id);
+  queueSync('delLog', { id }); // backend restores stock too
+  persist(); renderLogs(); renderDash();
+}
+
+// ━━━━ ORDERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderOrders(){
+  const needs = S.items.filter(i=>status(i)==='red');
+  const tb = document.getElementById('order-body');
+  if(!needs.length){ tb.innerHTML=`<tr class="no-data"><td colspan="8">주문 필요 품목 없음 ✓</td></tr>`; }
+  else tb.innerHTML = needs.map(i=>{
+    const wl = weeksLeft(i);
+    const w = getWeekly(i);
+    const rec = recommended(i);
+    return `<tr>
+      <td><strong>${i.name}</strong></td>
+      <td>${catTag(i.cat)}</td>
+      <td class="mono cr">${i.stock}</td>
+      <td class="mono">${w?w+' '+i.unit+'/주':'—'}</td>
+      <td class="mono cr">${wl!==null?wl+'주':'—'}</td>
+      <td class="mono cy"><strong>${rec}</strong></td>
+      <td class="c3">${i.unit}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="openReceive('${i.id}')">입고</button></td>
+    </tr>`;
+  }).join('');
+
+  const hist = [...S.receives].sort((a,b)=>b.date.localeCompare(a.date));
+  const hb = document.getElementById('receive-body');
+  if(!hist.length){ hb.innerHTML=`<tr class="no-data"><td colspan="4">입고 기록 없음</td></tr>`; return; }
+  hb.innerHTML = hist.map(r=>`<tr>
+    <td class="mono c2">${r.date}</td>
+    <td>${r.name}</td>
+    <td class="mono cg">+${r.qty}</td>
+    <td class="c3">${r.unit}</td>
+  </tr>`).join('');
+}
+
+function openReceive(id){
+  receiveId = id;
+  const item = S.items.find(i=>i.id===id);
+  document.getElementById('ri-name').value = item.name;
+  document.getElementById('ri-qty').value = recommended(item)||1;
+  document.getElementById('ri-date').value = new Date().toISOString().slice(0,10);
+  openM('m-receive');
+}
+
+function doReceive(){
+  const qty = parseFloat(document.getElementById('ri-qty').value);
+  const date = document.getElementById('ri-date').value;
+  if(!qty||!date){ alert('수량과 날짜를 입력하세요'); return; }
+  const item = S.items.find(i=>i.id===receiveId);
+  item.stock += qty;
+  const receive = {id:uid(), itemId:item.id, name:item.name, qty, unit:item.unit, date};
+  S.receives.push(receive);
+  queueSync('addReceive', { receive }); // backend adds stock too
+  persist(); closeM('m-receive'); renderOrders(); renderDash();
+}
+
+function copyOrder(){
+  const needs = S.items.filter(i=>status(i)==='red');
+  if(!needs.length){ alert('주문 필요 품목이 없습니다'); return; }
+  const date = new Date().toLocaleDateString('ko-KR');
+  let txt = `[주문서] ${date}\n\n`;
+  needs.forEach(i=>{ txt += `• ${i.name}: ${recommended(i)} ${i.unit} (현재 ${i.stock}${i.unit})\n`; });
+  navigator.clipboard.writeText(txt).then(()=>alert('클립보드에 복사됨'));
+}
+
+// ━━━━ STATS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function fillStatsSelect(){
+  const sel = document.getElementById('stats-sel');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— 품목 선택 —</option>' +
+    S.items.map(i=>`<option value="${i.id}" ${i.id===cur?'selected':''}>${i.name}</option>`).join('');
+}
+
+function renderStats(){
+  const id = document.getElementById('stats-sel').value;
+  const wrap = document.getElementById('stats-chart');
+  if(!id){ wrap.innerHTML='<div class="empty">품목을 선택하세요</div>'; return; }
+  const item = S.items.find(i=>i.id===id);
+  // 8 weeks
+  const now = new Date();
+  const weeks = [];
+  for(let w=7;w>=0;w--){
+    const s = new Date(now-(w+1)*7*864e5);
+    const e = new Date(now-w*7*864e5);
+    const lbl = `${s.getMonth()+1}/${s.getDate()}`;
+    const total = S.logs.filter(l=>l.itemId===id&&new Date(l.date)>=s&&new Date(l.date)<e).reduce((a,l)=>a+l.qty,0);
+    weeks.push({lbl, total});
+  }
+  const mx = Math.max(...weeks.map(w=>w.total), 1);
+  const colors = ['#4f9cf9','#60a5fa','#7db8fb','#93c5fd','#a5cffd','#bddffe','#c7e6ff','#d6eeff'];
+  wrap.innerHTML = `
+    <div class="week-grid">
+      ${weeks.map((w,idx)=>`
+        <div class="week-row">
+          <div class="week-lbl">${w.lbl}</div>
+          <div class="week-bg">
+            <div class="week-fill" style="width:${(w.total/mx*100).toFixed(1)}%;background:${colors[idx]};min-width:${w.total>0?'2px':'0'}">
+              ${w.total>0?w.total+item.unit:''}
+            </div>
+          </div>
+          <div class="week-val">${w.total} ${item.unit}</div>
+        </div>`).join('')}
+    </div>
+    <div class="c3" style="font-size:11px;margin-top:10px">
+      ℹ ${getWeekly(item)>0?`현재 적용 중인 주간 사용량: <span class="ca mono">${getWeekly(item)} ${item.unit}</span>`:'사용 기록 부족 — 수동 입력값 사용 중'}
+    </div>`;
+}
+
+function renderStatsSummary(){
+  const now = new Date();
+  const thisM = now.toISOString().slice(0,7);
+  const lastM = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
+  const cut4 = new Date(now-28*864e5);
+  const tb = document.getElementById('stats-body');
+  if(!S.items.length){ tb.innerHTML=`<tr class="no-data"><td colspan="8">품목 없음</td></tr>`; return; }
+  tb.innerHTML = S.items.map(i=>{
+    const t = s=>S.logs.filter(l=>l.itemId===i.id&&l.date.startsWith(s)).reduce((a,l)=>a+l.qty,0);
+    const thisT = t(thisM), lastT = t(lastM);
+    const t4 = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=cut4).reduce((a,l)=>a+l.qty,0);
+    const avg = +(t4/4).toFixed(1);
+    const cnt4 = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=cut4).length;
+    const autoUsed = cnt4 >= 3;
+    let trend = '—';
+    if(lastT>0){
+      const p = ((thisT-lastT)/lastT*100).toFixed(0);
+      trend = p>0?`<span class="cr">▲ ${p}%</span>`:p<0?`<span class="cg">▼ ${Math.abs(p)}%</span>`:'→ 0%';
+    }
+    return `<tr>
+      <td><strong>${i.name}</strong> ${catTag(i.cat)}</td>
+      <td class="mono">${thisT} ${i.unit}</td>
+      <td class="mono c2">${lastT} ${i.unit}</td>
+      <td class="mono">${t4} ${i.unit}</td>
+      <td class="mono ca">${avg} ${i.unit}/주</td>
+      <td class="mono c2">${i.manualWeekly||'—'} ${i.manualWeekly?i.unit:''}</td>
+      <td>${autoUsed?`<span class="chip chip-green">자동</span>`:`<span class="chip chip-yellow">수동</span>`}</td>
+      <td>${trend}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ━━━━ SETTINGS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function loadCfg(){
+  document.getElementById('cfg-weeks').value = S.cfg.defaultWeeks;
+  document.getElementById('cfg-order-weeks').value = S.cfg.orderWeeks;
+  // sync fields
+  document.getElementById('cfg-sync-url').value = SYNC.url || '';
+  document.getElementById('cfg-sync-pass').value = SYNC.password || '';
+  updateSyncInfo();
+}
+function updateSyncInfo(){
+  const el = document.getElementById('sync-info');
+  if(!el) return;
+  if(!SYNC.enabled){ el.textContent='연결 안 됨'; return; }
+  el.innerHTML = `✓ 연결됨 — ${SYNC.lastSync? '마지막 동기화: '+SYNC.lastSync.toLocaleTimeString('ko-KR'):'대기 중'}`;
+}
+function saveCfg(){
+  S.cfg.defaultWeeks = parseInt(document.getElementById('cfg-weeks').value)||2;
+  S.cfg.orderWeeks = parseInt(document.getElementById('cfg-order-weeks').value)||4;
+  queueSync('saveCfg', { cfg: S.cfg });
+  persist(); alert('저장되었습니다');
+}
+function resetAll(){
+  if(!SYNC.enabled){ alert('동기화가 설정되지 않았습니다.'); return; }
+  if(!confirm('시트의 모든 재고·사용·입고 기록을 삭제합니다.\n이 작업은 되돌릴 수 없습니다.')) return;
+  S.items=[]; S.logs=[]; S.receives=[];
+  syncPushAll().then(()=>{
+    renderDash();
+    alert('초기화 완료');
+  });
+}
+
+// ── Sync settings UI handlers ──────────────────────────────────────
+async function testSync(){
+  const url = document.getElementById('cfg-sync-url').value.trim();
+  const pass = document.getElementById('cfg-sync-pass').value.trim();
+  if(!url || !pass){ alert('URL과 비밀번호를 입력하세요'); return; }
+  const prevUrl = SYNC.url, prevPass = SYNC.password, prevEnabled = SYNC.enabled;
+  SYNC.url = url; SYNC.password = pass; SYNC.enabled = true;
+  try{
+    const res = await apiCall('ping');
+    alert('✓ 연결 성공!\n서버 시각: ' + new Date(res.ts).toLocaleString('ko-KR'));
+  }catch(e){
+    alert('✗ 연결 실패: ' + e.message);
+    SYNC.url = prevUrl; SYNC.password = prevPass; SYNC.enabled = prevEnabled;
+  }
+}
+
+async function saveSyncSettings(){
+  const url = document.getElementById('cfg-sync-url').value.trim();
+  const pass = document.getElementById('cfg-sync-pass').value.trim();
+  if(!url || !pass){ alert('URL과 비밀번호를 입력하세요'); return; }
+  SYNC.url = url; SYNC.password = pass; SYNC.enabled = true;
+  saveSyncCfg();
+  try{
+    await apiCall('ping');
+    await syncPull();
+    alert('✓ 연결 성공! 시트 데이터를 불러왔습니다.');
+    updateSyncInfo();
+    setSyncStatus('synced');
+    go('dash');
+  }catch(e){
+    alert('연결 실패: ' + e.message);
+    setSyncStatus('error', e.message);
+  }
+}
+
+async function initialUpload(){
+  if(!SYNC.enabled){ alert('먼저 동기화 설정을 저장해주세요'); return; }
+  if(!confirm('현재 메모리의 데이터를 시트에 덮어씁니다. 계속하시겠습니까?')) return;
+  await syncPushAll();
+  alert('업로드 완료!');
+  updateSyncInfo();
+}
+
+function disableSync(){
+  if(!confirm('동기화를 해제하면 앱을 사용할 수 없게 됩니다.\n계속하시겠습니까?')) return;
+  SYNC.url=''; SYNC.password=''; SYNC.enabled=false;
+  localStorage.removeItem(SYNC_CFG_KEY);
+  setSyncStatus('offline');
+  updateSyncInfo();
+  loadCfg();
+}
+
+function refreshActivePage(){
+  const active = document.querySelector('.page.active');
+  if(!active) return;
+  const id = active.id.replace('page-','');
+  const fn = { dash:renderDash, items:renderItems, use:()=>{fillUseSelect();renderLogs()},
+               orders:renderOrders, stats:()=>{fillStatsSelect();renderStats();renderStatsSummary()},
+               cfg:loadCfg };
+  fn[id]?.();
+}
+
+// ━━━━ MODAL ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openM(id){ document.getElementById(id).classList.add('open'); }
+function closeM(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); });
+});
+
+// ━━━━ HELPERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function chip(st){
+  if(st==='red') return `<span class="chip chip-red">주문 필요</span>`;
+  if(st==='yellow') return `<span class="chip chip-yellow">주의</span>`;
+  if(st==='green') return `<span class="chip chip-green">정상</span>`;
+  return `<span class="chip" style="background:var(--surface3);color:var(--text3)">기록없음</span>`;
+}
+function catTag(c){
+  return c==='office'
+    ? `<span class="tag-s tag-office">사무용품</span>`
+    : `<span class="tag-s tag-supply">소모품</span>`;
+}
+
+// ━━━━ INIT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function init(){
+  loadSyncCfg();
+  document.getElementById('hdate').textContent = new Date().toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+  document.getElementById('u-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('log-month').value = new Date().toISOString().slice(0,7);
+  setFilter('all');
+
+  if(SYNC.enabled){
+    setSyncStatus('syncing');
+    syncPull(true).then(()=>{
+      // periodic auto pull every 60s while tab is active
+      setInterval(()=>{ if(SYNC.enabled && document.visibilityState==='visible') syncPull(true); }, 60000);
+    });
+  } else {
+    // 동기화 미설정 → 설정 페이지로 보내고 안내
+    setSyncStatus('offline');
+    go('cfg');
+    setTimeout(()=>{
+      alert('이 앱은 Google Sheets와 연동되어 동작합니다.\n먼저 클라우드 동기화를 설정해주세요.\n\n자세한 방법은 SETUP_GUIDE.md를 참고하세요.');
+    }, 300);
+  }
+}
+
+init();
+
+// 동기화 안 된 변경사항 있을 때 페이지 이탈 경고
+window.addEventListener('beforeunload', (e)=>{
+  if(SYNC.queue && SYNC.queue.length > 0){
+    e.preventDefault();
+    e.returnValue = '저장되지 않은 변경사항이 있습니다.';
+    return e.returnValue;
+  }
+});
+</script>
+</body>
+</html>
