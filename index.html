@@ -1254,15 +1254,6 @@ function expiryDaysLeft(item){
   return Math.ceil(diff / 864e5);
 }
 
-function expiryChip(item){
-  const d = expiryDaysLeft(item);
-  if(d === null) return '';
-  if(d < 0)  return `<span class="chip chip-red" style="font-size:10px">만료됨</span>`;
-  if(d <= 7)  return `<span class="chip chip-red" style="font-size:10px">D-${d}</span>`;
-  if(d <= 30) return `<span class="chip chip-yellow" style="font-size:10px">D-${d}</span>`;
-  return `<span class="chip chip-green" style="font-size:10px">D-${d}</span>`;
-}
-
 // ── 비용 헬퍼 ─────────────────────────────────────────────────
 function fmt원(n){ return n ? n.toLocaleString('ko-KR')+'원' : '—'; }
 
@@ -1272,30 +1263,6 @@ function monthlyCost(item, monthStr){
 }
 
 // ── 입고예정 헬퍼 ─────────────────────────────────────────────
-function renderPendingOrders(){
-  const el = document.getElementById('pending-order-body');
-  if(!el) return;
-  const list = (S.pendingOrders||[]).sort((a,b)=>a.expectedDate.localeCompare(b.expectedDate));
-  if(!list.length){
-    el.innerHTML='<tr class="no-data"><td colspan="5">입고 예정 없음</td></tr>'; return;
-  }
-  const today = new Date().toISOString().slice(0,10);
-  el.innerHTML = list.map(p=>{
-    const daysLeft = Math.ceil((new Date(p.expectedDate)-new Date())/864e5);
-    const urgency = daysLeft < 0 ? 'cr' : daysLeft <= 3 ? 'cy' : 'cg';
-    return `<tr>
-      <td><strong>${p.name}</strong></td>
-      <td class="mono">${p.qty} ${p.unit}</td>
-      <td class="mono">${p.orderedDate}</td>
-      <td class="mono ${urgency}">${p.expectedDate} <span class="c3" style="font-size:11px">(${daysLeft<0?'지남':daysLeft===0?'오늘':daysLeft+'일 후'})</span></td>
-      <td>
-        <button class="btn btn-primary btn-sm" onclick="openReceive('${p.itemId}')">입고 처리</button>
-        <button class="btn btn-ghost btn-sm" onclick="cancelPending('${p.id}')" style="color:var(--red)">취소</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
 function cancelPending(id){
   if(!confirm('입고 예정을 취소하시겠습니까?')) return;
   S.pendingOrders = (S.pendingOrders||[]).filter(p=>p.id!==id);
@@ -1874,79 +1841,10 @@ function fillSupplierSelect(selectedId){
     suppliers.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${s.name}</option>`).join('');
 }
 
-function openAdd(){
-  editId = null;
-  document.getElementById('m-item-title').textContent = '품목 추가';
-  ['fi-name','fi-unit','fi-memo','fi-expiry'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('fi-stock').value   = '';
-  document.getElementById('fi-price').value   = '';
-  document.getElementById('fi-warn').value    = S.cfg.defaultWarnWeeks   || 4;
-  document.getElementById('fi-danger').value  = S.cfg.defaultDangerWeeks || 2;
-  document.getElementById('fi-weekly').value  = '';
-  fillCatSelect(getCats()[0]?.id || '');
-  fillSupplierSelect('');
-  openM('m-item');
-}
 
-function openEdit(id){
-  editId = id;
-  const item = S.items.find(i=>i.id===id);
-  document.getElementById('m-item-title').textContent = '품목 수정';
-  document.getElementById('fi-name').value    = item.name;
-  document.getElementById('fi-unit').value    = item.unit;
-  document.getElementById('fi-stock').value   = item.stock;
-  document.getElementById('fi-price').value   = item.unitPrice || '';
-  document.getElementById('fi-warn').value    = item.warnWeeks   ?? S.cfg.defaultWarnWeeks   ?? 4;
-  document.getElementById('fi-danger').value  = item.dangerWeeks ?? S.cfg.defaultDangerWeeks ?? 2;
-  document.getElementById('fi-expiry').value  = item.expiry || '';
-  document.getElementById('fi-weekly').value  = item.manualWeekly || '';
-  document.getElementById('fi-memo').value    = item.memo || '';
-  fillCatSelect(item.cat);
-  fillSupplierSelect(item.supplierId||'');
-  openM('m-item');
-}
-
-function saveItem(){
-  const name        = document.getElementById('fi-name').value.trim();
-  const stock       = parseFloat(document.getElementById('fi-stock').value);
-  const warnWeeks   = parseInt(document.getElementById('fi-warn').value);
-  const dangerWeeks = parseInt(document.getElementById('fi-danger').value);
-  if(!name||isNaN(stock)||isNaN(warnWeeks)||isNaN(dangerWeeks)){ alert('필수 항목을 입력하세요'); return; }
-  if(dangerWeeks >= warnWeeks){ alert('위험 기준은 주의 기준보다 작아야 합니다'); return; }
-  const data = {
-    name, stock, warnWeeks, dangerWeeks,
-    cat:          document.getElementById('fi-cat').value,
-    supplierId:   document.getElementById('fi-supplier').value || '',
-    unit:         document.getElementById('fi-unit').value.trim() || '개',
-    unitPrice:    parseFloat(document.getElementById('fi-price').value) || 0,
-    expiry:       document.getElementById('fi-expiry').value || '',
-    manualWeekly: parseFloat(document.getElementById('fi-weekly').value) || 0,
-    memo:         document.getElementById('fi-memo').value.trim()
-  };
-  let saved;
-  if(editId){
-    saved = Object.assign(S.items.find(i=>i.id===editId), data);
-    queueSync('updItem', { item: saved });
-  } else {
-    saved = {id:uid(), ...data};
-    S.items.push(saved);
-    queueSync('addItem', { item: saved });
-  }
-  persist(); closeM('m-item');
-  renderItems(); renderDash();
-}
-
-function delItem(id){
-  if(!confirm('삭제하시겠습니까?')) return;
-  S.items = S.items.filter(i=>i.id!==id);
-  S.logs = S.logs.filter(l=>l.itemId!==id);
-  queueSync('delItem', { id });
-  persist(); renderItems(); renderDash();
-}
-
-// ━━━━ USE LOG ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function fillUseSelect(){
   const sel = document.getElementById('u-item');
+  if(!sel) return;
   sel.innerHTML = '<option value="">— 품목 선택 —</option>' +
     S.items.map(i=>`<option value="${i.id}">${i.name} (현재: ${i.stock}${i.unit})</option>`).join('');
 }
@@ -2048,56 +1946,6 @@ function openReceive(id){
   openM('m-receive');
 }
 
-function togglePending(){
-  const isPending = document.getElementById('ri-pending').checked;
-  document.getElementById('ri-expected-wrap').style.display = isPending ? '' : 'none';
-  document.getElementById('ri-submit-btn').textContent = isPending ? '입고 예정 등록' : '입고 완료';
-}
-
-function doReceive(){
-  const qty      = parseFloat(document.getElementById('ri-qty').value);
-  const date     = document.getElementById('ri-date').value;
-  const expiry   = document.getElementById('ri-expiry').value || '';
-  const isPending= document.getElementById('ri-pending').checked;
-  const expected = document.getElementById('ri-expected').value || '';
-  if(!qty){ alert('수량을 입력하세요'); return; }
-  if(!isPending && !date){ alert('날짜를 입력하세요'); return; }
-  if(isPending && !expected){ alert('입고 예정일을 입력하세요'); return; }
-
-  const item = S.items.find(i=>i.id===receiveId);
-
-  if(isPending){
-    // 예정 등록 — 재고 미반영, pendingOrders에 저장
-    if(!S.pendingOrders) S.pendingOrders = [];
-    S.pendingOrders.push({
-      id: uid(), itemId: item.id, name: item.name,
-      qty, unit: item.unit, expectedDate: expected, orderedDate: date||new Date().toISOString().slice(0,10)
-    });
-    persist();
-    closeM('m-receive');
-    renderOrders();
-    return;
-  }
-
-  // 실제 입고
-  item.stock += qty;
-  if(expiry) item.expiry = expiry; // 입고 시 유통기한 갱신
-  const receive = {id:uid(), itemId:item.id, name:item.name, qty, unit:item.unit, date, expiry};
-  S.receives.push(receive);
-
-  // 입고 예정 중 같은 품목 있으면 제거
-  if(S.pendingOrders){
-    S.pendingOrders = S.pendingOrders.filter(p=>p.itemId !== item.id);
-  }
-
-  queueSync('addReceive', { receive });
-  queueSync('updItem', { item });
-  persist();
-  closeM('m-receive');
-  renderOrders();
-  renderDash();
-}
-
 function copyOrder(){
   const needs = S.items.filter(i=>status(i)==='red');
   if(!needs.length){ alert('주문 필요 품목이 없습니다'); return; }
@@ -2148,64 +1996,6 @@ function renderStats(){
     <div class="c3" style="font-size:11px;margin-top:10px">
       ℹ ${getWeekly(item)>0?`현재 적용 중인 주간 사용량: <span class="ca mono">${getWeekly(item)} ${item.unit}</span>`:'사용 기록 부족 — 수동 입력값 사용 중'}
     </div>`;
-}
-
-function renderCostStats(){
-  const now    = new Date();
-  const thisM  = now.toISOString().slice(0,7);
-  const lastM  = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
-  const cut4   = new Date(now - 28*864e5);
-
-  // 비용 집계
-  const rows = S.items.filter(i=>i.unitPrice>0).map(i=>{
-    const thisUsed = S.logs.filter(l=>l.itemId===i.id&&l.date.startsWith(thisM)).reduce((s,l)=>s+l.qty,0);
-    const lastUsed = S.logs.filter(l=>l.itemId===i.id&&l.date.startsWith(lastM)).reduce((s,l)=>s+l.qty,0);
-    const used4w   = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=cut4).reduce((s,l)=>s+l.qty,0);
-    return {
-      name: i.name, cat: i.cat, unit: i.unit, price: i.unitPrice,
-      thisUsed, lastUsed, used4w,
-      thisCost: i.unitPrice * thisUsed,
-      lastCost: i.unitPrice * lastUsed,
-      cost4w:   i.unitPrice * used4w,
-    };
-  }).sort((a,b)=>b.thisCost-a.thisCost);
-
-  const totalThis = rows.reduce((s,r)=>s+r.thisCost, 0);
-  const totalLast = rows.reduce((s,r)=>s+r.lastCost, 0);
-  const total4w   = rows.reduce((s,r)=>s+r.cost4w,   0);
-  const diff = totalLast > 0 ? ((totalThis-totalLast)/totalLast*100).toFixed(0) : null;
-
-  // KPI
-  const kpiRow = document.getElementById('cost-kpi-row');
-  if(kpiRow) kpiRow.innerHTML = `
-    <div style="background:var(--surface2);border-radius:8px;padding:14px">
-      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">이번 달</div>
-      <div style="font-family:var(--mono);font-size:22px;font-weight:600">${totalThis.toLocaleString()}원</div>
-      ${diff!==null?`<div style="font-size:11px;margin-top:4px;color:${+diff>0?'var(--red)':+diff<0?'var(--green)':'var(--text3)'}">${+diff>0?'▲':'▼'} ${Math.abs(diff)}% vs 지난달</div>`:''}
-    </div>
-    <div style="background:var(--surface2);border-radius:8px;padding:14px">
-      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">지난 달</div>
-      <div style="font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text2)">${totalLast.toLocaleString()}원</div>
-    </div>
-    <div style="background:var(--surface2);border-radius:8px;padding:14px">
-      <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">4주 누계</div>
-      <div style="font-family:var(--mono);font-size:22px;font-weight:600;color:var(--accent)">${total4w.toLocaleString()}원</div>
-    </div>`;
-
-  // 테이블
-  const tb = document.getElementById('cost-body');
-  if(!tb) return;
-  if(!rows.length){
-    tb.innerHTML='<tr class="no-data"><td colspan="6">단가가 등록된 품목 없음 — 품목 수정에서 단가를 입력하세요</td></tr>'; return;
-  }
-  tb.innerHTML = rows.map(r=>`<tr>
-    <td><strong>${r.name}</strong> ${catTag(r.cat)}</td>
-    <td class="mono c2">${r.price.toLocaleString()}원/${r.unit}</td>
-    <td class="mono">${r.thisUsed} ${r.unit}</td>
-    <td class="mono ${r.thisCost>0?'':'c3'}">${r.thisCost>0?r.thisCost.toLocaleString()+'원':'—'}</td>
-    <td class="mono c2">${r.lastCost>0?r.lastCost.toLocaleString()+'원':'—'}</td>
-    <td class="mono ca">${r.cost4w>0?r.cost4w.toLocaleString()+'원':'—'}</td>
-  </tr>`).join('');
 }
 
 function renderStatsSummary(){
@@ -2411,10 +2201,19 @@ function chip(st){
 }
 // ━━━━ CATEGORY MANAGEMENT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const CAT_PALETTE = [
-  '#4f9cf9','#f87171','#4ade80','#fbbf24','#a78bfa',
-  '#fb923c','#34d399','#f472b6','#60a5fa','#9ca3af'
+  '#0f766e','#1570ef','#b91c1c','#d97706','#7c3aed',
+  '#0891b2','#16a34a','#db2777','#475569','#92400e'
 ];
 let editCatId = null;
+
+// ━━━━ CATEGORY HELPERS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function getCats(){ return S.cfg.categories || []; }
+function getCat(id){ return getCats().find(c=>c.id===id) || {id, name:id, color:'#9ca3af'}; }
+function catTag(id){
+  const c = getCat(id);
+  const bg = c.color+'26';
+  return `<span class="tag-s" style="background:${bg};color:${c.color}">${c.name}</span>`;
+}
 
 function renderFilterTabs(){
   const wrap = document.getElementById('filter-tabs');
