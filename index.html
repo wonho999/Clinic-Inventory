@@ -1608,24 +1608,6 @@ function renderDash(){
   }
 }
 
-  // chart
-  const cut4 = new Date(Date.now()-28*864e5);
-  const top5 = S.items.map(i=>{
-    const t = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=cut4).reduce((s,l)=>s+l.qty,0);
-    return {name:i.name, unit:i.unit, total:t};
-  }).filter(d=>d.total>0).sort((a,b)=>b.total-a.total).slice(0,5);
-
-  const chart = document.getElementById('dash-chart');
-  if(!top5.length){ chart.innerHTML='<div class="empty">사용 기록이 없습니다</div>'; return; }
-  const mx = top5[0].total;
-  chart.innerHTML = `<div class="chart-rows">${top5.map(d=>`
-    <div class="chart-row">
-      <div class="chart-lbl" title="${d.name}">${d.name}</div>
-      <div class="chart-bg"><div class="chart-fill" style="width:${(d.total/mx*100).toFixed(1)}%"></div></div>
-      <div class="chart-num">${d.total} ${d.unit}</div>
-    </div>`).join('')}</div>`;
-}
-
 // ━━━━ ITEMS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function setFilter(f){
   itemFilter = f;
