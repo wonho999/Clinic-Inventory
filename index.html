@@ -1617,7 +1617,7 @@ function itemCard(i){
   const st = status(i);
   const wl = weeksLeft(i);
   const w  = getWeekly(i);
-  const ratio = wl !== null ? Math.min(wl / (i.alertWeeks * 2) * 100, 100) : 50;
+  const ratio = wl !== null ? Math.min(wl / ((i.warnWeeks ?? S.cfg.defaultWarnWeeks ?? 4)) * 100, 100) : 50;
   const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
   const logCnt = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=new Date(Date.now()-28*864e5)).length;
   const weeklyLabel = logCnt >= 3
@@ -1653,7 +1653,7 @@ function itemCard(i){
       </div>
       <div class="mcard-cell">
         <div class="mcard-lbl">알림 기준</div>
-        <div class="mcard-val ca">${i.alertWeeks}주</div>
+        <div class="mcard-val ca">${i.dangerWeeks ?? S.cfg.defaultDangerWeeks ?? 2}주</div>
       </div>
       <div class="mcard-cell">
         <div class="mcard-lbl">주간 사용량</div>
@@ -1708,7 +1708,7 @@ function refreshMobileCard(itemId){
   const item = S.items.find(i=>i.id===itemId); if(!item) return;
   const st = status(item);
   const wl = weeksLeft(item);
-  const ratio = wl !== null ? Math.min(wl / (item.alertWeeks*2) * 100, 100) : 50;
+  const ratio = wl !== null ? Math.min(wl / ((item.warnWeeks ?? S.cfg.defaultWarnWeeks ?? 4)) * 100, 100) : 50;
   const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
   const stockEl = document.getElementById('mstock-'+itemId);
   if(stockEl){
@@ -1731,7 +1731,7 @@ function itemRow(i){
   const st = status(i);
   const wl = weeksLeft(i);
   const w  = getWeekly(i);
-  const ratio = wl !== null ? Math.min(wl / (i.alertWeeks * 2) * 100, 100) : 50;
+  const ratio = wl !== null ? Math.min(wl / ((i.warnWeeks ?? S.cfg.defaultWarnWeeks ?? 4)) * 100, 100) : 50;
   const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
   const logCnt = S.logs.filter(l=>l.itemId===i.id&&new Date(l.date)>=new Date(Date.now()-28*864e5)).length;
   const weeklyLabel = logCnt >= 3
@@ -1753,7 +1753,7 @@ function itemRow(i){
         onclick="inlineStock('${i.id}', this)">
       ${i.stock}
     </td>
-    <td class="mono ca">${i.alertWeeks}주</td>
+    <td class="mono ca">${i.dangerWeeks ?? S.cfg.defaultDangerWeeks ?? 2}주</td>
     <td>${weeklyLabel}</td>
     <td id="wl-${i.id}" class="mono ${st==='red'?'cr':st==='yellow'?'cy':'cg'}">${wl!==null?wl+'주':'—'}</td>
     <td>${i.expiry ? expiryChip(i) + `<span class="mono c3" style="font-size:11px;margin-left:4px">${i.expiry}</span>` : '<span class="c3">—</span>'}</td>
@@ -1810,7 +1810,7 @@ function refreshRow(itemId){
   if(!item) return;
   const st  = status(item);
   const wl  = weeksLeft(item);
-  const ratio = wl !== null ? Math.min(wl / (item.alertWeeks*2) * 100, 100) : 50;
+  const ratio = wl !== null ? Math.min(wl / ((item.warnWeeks ?? S.cfg.defaultWarnWeeks ?? 4)) * 100, 100) : 50;
   const barCls = st==='red'?'bar-red':st==='yellow'?'bar-yellow':'bar-green';
 
   const stockCell = document.getElementById('stock-cell-'+itemId);
@@ -1841,6 +1841,14 @@ function fillSupplierSelect(selectedId){
     suppliers.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${s.name}</option>`).join('');
 }
 
+
+function delItem(id){
+  if(!confirm('이 품목을 삭제하시겠습니까?')) return;
+  S.items = S.items.filter(i=>i.id!==id);
+  S.logs  = S.logs.filter(l=>l.itemId!==id);
+  queueSync('delItem', { id });
+  persist(); renderItems(); renderDash();
+}
 
 function fillUseSelect(){
   const sel = document.getElementById('u-item');
@@ -2307,7 +2315,7 @@ function saveCat(){
     cats.push({ id, name, color });
   }
   S.cfg.categories = cats;
-  queueSync('saveCfg', { cfg: { defaultWeeks: S.cfg.defaultWeeks, orderWeeks: S.cfg.orderWeeks, categories: JSON.stringify(cats) } });
+  pushCfg();
   closeM('m-cat');
   renderCatList();
   renderFilterTabs();
@@ -2319,7 +2327,7 @@ function deleteCat(id){
   if(inUse > 0 && !confirm(`이 분류를 사용 중인 품목이 ${inUse}개 있습니다.\n삭제하면 해당 품목의 분류가 비어있게 됩니다. 계속하시겠습니까?`)) return;
   if(!inUse && !confirm('이 분류를 삭제하시겠습니까?')) return;
   S.cfg.categories = getCats().filter(c=>c.id!==id);
-  queueSync('saveCfg', { cfg: { defaultWeeks: S.cfg.defaultWeeks, orderWeeks: S.cfg.orderWeeks, categories: JSON.stringify(S.cfg.categories) } });
+  pushCfg();
   renderCatList();
   renderFilterTabs();
   if(itemFilter===id) setFilter('all');
