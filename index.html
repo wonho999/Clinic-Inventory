@@ -2246,7 +2246,7 @@ function renderFilterTabs(){
   const search = wrap.querySelector('#q-search');
   const count  = wrap.querySelector('#item-count');
   // 탭 버튼만 재생성
-  wrap.querySelectorAll('.filter-btn').forEach(b=>b.remove());
+  Array.from(wrap.querySelectorAll('.filter-btn')||[]).forEach(b=>b.remove());
   const all = document.createElement('button');
   all.className = `btn btn-sm filter-btn ${itemFilter==='all'?'btn-primary':'btn-outline'}`;
   all.textContent = '전체';
