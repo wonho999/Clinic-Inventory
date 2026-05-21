@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 캐시 완전 비활성화 — 배포 시 항상 최신본 로드 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>재고 관리</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -1044,6 +1048,20 @@ select option{background:var(--surface2)}
 // ━━━━ STATE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const KEY = 'clinv3';
 const SYNC_CFG_KEY = 'clinv3_sync_cfg';
+const APP_VERSION = '202605210540';  // 배포 시 자동 갱신
+
+// ── 버전 체크: 새 버전 배포 시 자동 리로드 ──────────────────────
+(function checkVersion(){
+  const VER_KEY = 'clinv3_version';
+  const stored = localStorage.getItem(VER_KEY);
+  if(stored && stored !== APP_VERSION){
+    // 새 버전 감지 → 캐시 비우고 리로드
+    localStorage.setItem(VER_KEY, APP_VERSION);
+    location.reload(true);
+    return;
+  }
+  localStorage.setItem(VER_KEY, APP_VERSION);
+})();
 
 let S = {
   items: [],
@@ -1925,40 +1943,48 @@ function submitRequestModal(){
 
 // ━━━━ RENDER ORDER REQUESTS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function renderOrderRequests(){
-  const reqs = (S.orderRequests||[]).filter(r=>r.status==='pending');
+  const reqs = (S.orderRequests||[]).filter(r=>r.status==='pending'||r.status==='approved');
   const tb   = document.getElementById('req-body');
   const card = document.getElementById('req-card');
   const countEl = document.getElementById('req-count');
   if(!tb||!card) return;
 
-  // 뱃지 업데이트
+  // 뱃지 — pending 건수만
   const nb = document.getElementById('nb-orders');
   const redCount = S.items.filter(i=>status(i)==='red').length;
-  const reqCount = reqs.length;
-  const total = redCount + reqCount;
+  const pendingCount = reqs.filter(r=>r.status==='pending').length;
+  const total = redCount + pendingCount;
   if(nb){ nb.style.display = total ? 'inline' : 'none'; nb.textContent = total; }
-  if(countEl) countEl.textContent = reqs.length ? `${reqs.length}건 대기` : '';
+  if(countEl) countEl.textContent = reqs.length
+    ? `대기 ${pendingCount}건 / 승인 ${reqs.filter(r=>r.status==='approved').length}건`
+    : '';
 
-  if(!reqs.length){
-    card.style.display = 'none'; return;
-  }
+  if(!reqs.length){ card.style.display='none'; return; }
   card.style.display = '';
+
   tb.innerHTML = reqs.map(r=>{
-    const item = S.items.find(i=>i.id===r.itemId);
-    const st   = item ? status(item) : 'unknown';
-    return `<tr>
+    const item    = S.items.find(i=>i.id===r.itemId);
+    const st      = item ? status(item) : 'unknown';
+    const approved = r.status==='approved';
+    const rowStyle = approved ? 'background:var(--surface2)' : '';
+    const statusChip = approved
+      ? `<span class="chip chip-green" style="margin-left:6px">승인됨</span>`
+      : `<span class="chip chip-yellow" style="margin-left:6px">대기</span>`;
+    const actions = approved
+      ? `<button class="btn btn-ghost btn-sm" onclick="cancelApproval('${r.id}')">승인취소</button>`
+      : `<button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">승인→입고예정</button>
+         <button class="btn btn-ghost btn-sm" onclick="editRequest('${r.id}')">수정</button>
+         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="rejectRequest('${r.id}')">반려</button>`;
+    return `<tr style="${rowStyle}">
       <td>
-        <strong>${esc(r.itemName)}</strong>
+        <strong>${esc(r.itemName)}</strong>${statusChip}
         ${r.qty ? `<span class="mono c2" style="font-size:12px;margin-left:6px">× ${r.qty} ${r.unit}</span>` : ''}
       </td>
       <td class="mono ${st==='red'?'cr':st==='yellow'?'cy':''}">${item?item.stock+' '+item.unit:'—'}</td>
       <td style="font-size:12px;color:var(--accent)">${esc(r.requestedBy)}</td>
       <td class="mono c3" style="font-size:11px">${r.requestedAt}</td>
       <td class="c3" style="font-size:12px">${esc(r.memo||'—')}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-primary btn-sm" onclick="approveRequest('${r.id}')">승인→입고예정</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="rejectRequest('${r.id}')">반려</button>
-      </td>
+      <td style="white-space:nowrap">${actions}</td>
     </tr>`;
   }).join('');
 }
@@ -1966,19 +1992,67 @@ function renderOrderRequests(){
 function approveRequest(reqId){
   const req = (S.orderRequests||[]).find(r=>r.id===reqId);
   if(!req) return;
-  // pending → approved
   req.status = 'approved';
-  // 입고예정으로 등록
+  // 입고예정 등록 + req에 receiveId 연결 (취소 시 제거용)
   const pending = {
     id: uid(), itemId: req.itemId, name: req.itemName,
     qty: req.qty, unit: req.unit,
     date: new Date().toISOString().split('T')[0],
     expectedDate: '', pending: true
   };
+  req.pendingReceiveId = pending.id;
   S.receives.push(pending);
   queueSync('addReceive', { receive: pending });
   pushCfg();
   renderOrders();
+}
+
+function cancelApproval(reqId){
+  const req = (S.orderRequests||[]).find(r=>r.id===reqId);
+  if(!req) return;
+  if(!confirm(`"${req.itemName}" 승인을 취소하고 대기 상태로 되돌립니까?\n연결된 입고예정도 함께 제거됩니다.`)) return;
+  // 연결된 입고예정 제거
+  if(req.pendingReceiveId){
+    S.receives = S.receives.filter(r=>r.id!==req.pendingReceiveId);
+  }
+  req.status = 'pending';
+  delete req.pendingReceiveId;
+  pushCfg();
+  renderOrders();
+}
+
+function editRequest(reqId){
+  const req = (S.orderRequests||[]).find(r=>r.id===reqId);
+  if(!req) return;
+  // 요청 수정 — openRequestModal 재활용 후 기존 값 채우기
+  requestModalItemId = req.itemId;
+  const item = S.items.find(i=>i.id===req.itemId);
+  document.getElementById('mreq-name').value = req.itemName;
+  document.getElementById('mreq-qty').value  = req.qty || '';
+  document.getElementById('mreq-memo').value = req.memo || '';
+  document.getElementById('mreq-stock-hint').textContent =
+    item ? `현재 재고: ${item.stock} ${item.unit}  |  권장 주문량: ${recommended(item)} ${item.unit}` : '';
+  // 저장 버튼을 수정 모드로 교체
+  const foot = document.querySelector('#m-request .modal-foot');
+  foot.innerHTML = `
+    <button class="btn btn-outline" onclick="closeM('m-request')">취소</button>
+    <button class="btn btn-primary" onclick="saveEditRequest('${reqId}')">수정 저장</button>`;
+  openM('m-request');
+}
+
+function saveEditRequest(reqId){
+  const req = (S.orderRequests||[]).find(r=>r.id===reqId);
+  if(!req) return;
+  const inputQty = parseFloat(document.getElementById('mreq-qty').value);
+  req.qty  = inputQty > 0 ? inputQty : req.qty;
+  req.memo = document.getElementById('mreq-memo').value.trim();
+  pushCfg();
+  closeM('m-request');
+  // 모달 푸터를 원래대로 복원
+  document.querySelector('#m-request .modal-foot').innerHTML = `
+    <button class="btn btn-outline" onclick="closeM('m-request')">취소</button>
+    <button class="btn btn-primary" onclick="submitRequestModal()">요청</button>`;
+  renderOrderRequests();
 }
 
 function rejectRequest(reqId){
