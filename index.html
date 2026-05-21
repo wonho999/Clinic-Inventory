@@ -1990,6 +1990,7 @@ function rejectRequest(reqId){
 }
 
 
+function fillSupplierSelect(selectedId){
   const sel = document.getElementById('fi-supplier');
   if(!sel) return;
   const suppliers = S.cfg.suppliers || [];
