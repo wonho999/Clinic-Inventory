@@ -600,39 +600,31 @@ select option{background:var(--surface2)}
 
       <!-- ★ 주문 요청 작성 (주문서 형식) -->
       <div class="card" style="margin-bottom:16px">
-        <div class="card-head">
+        <div class="card-head" style="cursor:pointer" onclick="toggleOrderCompose()">
           <span class="card-title">📋 주문 요청 작성</span>
-          <div class="card-actions">
-            <span class="c3" style="font-size:11px" id="order-compose-hint">품목에 체크 후 요청 제출</span>
-            <button class="btn btn-ghost btn-sm" onclick="toggleOrderCompose()">접기/펼치기</button>
+          <div class="card-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-red btn-sm" id="oc-quick-btn" onclick="quickOrderRed()" style="display:none">🚨 <span id="oc-red-count">0</span>건 즉시 요청</button>
+            <span class="c3 mono" style="font-size:11px" id="oc-toggle-hint">▼ 펼치기</span>
           </div>
         </div>
-        <div id="order-compose-body">
-          <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button class="btn btn-outline btn-sm" onclick="selectOrderItems('red')">🚨 주문필요 전체 선택</button>
-            <button class="btn btn-outline btn-sm" onclick="selectOrderItems('yellow')">⚠️ 주의 포함 선택</button>
+        <div id="order-compose-body" style="display:none">
+          <!-- 탭 + 검색 -->
+          <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap" id="oc-filter-tabs">
+            <input type="text" id="oc-search" placeholder="품목 검색..." oninput="renderOrderCompose()"
+              style="width:140px;padding:5px 10px;font-size:12px;margin-left:auto">
+          </div>
+          <!-- 빠른 선택 / 제출 -->
+          <div style="padding:8px 16px;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--surface2)">
+            <button class="btn btn-outline btn-sm" onclick="selectOrderItems('red')">🚨 주문필요 전체</button>
+            <button class="btn btn-outline btn-sm" onclick="selectOrderItems('yellow')">⚠️ 주의 포함</button>
             <button class="btn btn-ghost btn-sm" onclick="selectOrderItems('none')">선택 해제</button>
             <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-              <span class="c3 mono" style="font-size:11px" id="order-selected-count">0개 선택됨</span>
-              <button class="btn btn-primary" onclick="submitOrderCompose()" id="order-compose-submit">요청 제출</button>
+              <span class="c3 mono" style="font-size:11px" id="order-selected-count">0개 선택</span>
+              <button class="btn btn-primary btn-sm" onclick="submitOrderCompose()" id="order-compose-submit">요청 제출</button>
             </div>
           </div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr>
-                <th style="width:32px"><input type="checkbox" id="order-check-all" onchange="toggleAllOrderItems(this.checked)" title="전체 선택"></th>
-                <th>품목</th>
-                <th>분류</th>
-                <th>현재 재고</th>
-                <th>주간 사용</th>
-                <th>잔여</th>
-                <th>상태</th>
-                <th>요청 수량</th>
-                <th>메모</th>
-              </tr></thead>
-              <tbody id="order-compose-items"></tbody>
-            </table>
-          </div>
+          <!-- 그룹별 목록 -->
+          <div id="order-compose-items"></div>
         </div>
       </div>
 
@@ -1073,7 +1065,7 @@ select option{background:var(--surface2)}
 // ━━━━ STATE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const KEY = 'clinv3';
 const SYNC_CFG_KEY = 'clinv3_sync_cfg';
-const APP_VERSION = '202605270540';  // 배포 시 자동 갱신
+const APP_VERSION = '202605210540';  // 배포 시 자동 갱신
 
 // ── 버전 체크: 새 버전 배포 시 자동 리로드 ──────────────────────
 (function checkVersion(){
@@ -1975,75 +1967,165 @@ function submitRequestModal(){
 }
 
 // ━━━━ ORDER COMPOSE (주문서 형식 일괄 요청) ━━━━━━━━━━━━━━━━━━━
-let orderComposeCollapsed = false;
+let orderComposeOpen = false;
+let orderComposeCat  = 'all';      // 'all' | catId
+let orderComposeGroupOpen = { red:true, yellow:false, green:false };  // 그룹 펼침 상태
 
 function toggleOrderCompose(){
-  orderComposeCollapsed = !orderComposeCollapsed;
+  orderComposeOpen = !orderComposeOpen;
   const body = document.getElementById('order-compose-body');
-  if(body) body.style.display = orderComposeCollapsed ? 'none' : '';
+  const hint = document.getElementById('oc-toggle-hint');
+  if(!body) return;
+  body.style.display = orderComposeOpen ? '' : 'none';
+  if(hint) hint.textContent = orderComposeOpen ? '▲ 접기' : '▼ 펼치기';
+  if(orderComposeOpen) renderOrderCompose();
+}
+
+function quickOrderRed(){
+  // 헤더의 빠른 요청 버튼: 펼치고 → 빨강 자동 선택 → 안내
+  if(!orderComposeOpen) toggleOrderCompose();
+  setTimeout(()=>{
+    selectOrderItems('red');
+    document.getElementById('order-compose-body')?.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 50);
+}
+
+function renderOrderComposeHeader(){
+  // 헤더의 "🚨 N건 즉시 요청" 버튼 표시 제어
+  const reds = S.items.filter(i=>status(i)==='red').length;
+  const btn  = document.getElementById('oc-quick-btn');
+  const cntE = document.getElementById('oc-red-count');
+  if(btn) btn.style.display = reds>0 ? '' : 'none';
+  if(cntE) cntE.textContent = reds;
+}
+
+function renderOrderComposeTabs(){
+  const wrap = document.getElementById('oc-filter-tabs');
+  if(!wrap) return;
+  const search = wrap.querySelector('#oc-search');
+  // 기존 탭 제거
+  Array.from(wrap.querySelectorAll('.oc-cat-btn')||[]).forEach(b=>b.remove());
+  const mkBtn = (id, label)=>{
+    const b = document.createElement('button');
+    const active = orderComposeCat===id;
+    b.className = `btn btn-sm oc-cat-btn ${active?'btn-primary':'btn-outline'}`;
+    b.textContent = label;
+    b.onclick = ()=>{ orderComposeCat = id; renderOrderCompose(); };
+    wrap.insertBefore(b, search);
+    return b;
+  };
+  mkBtn('all', '전체');
+  (S.cfg.categories||[]).forEach(c=>mkBtn(c.id, c.name));
 }
 
 function renderOrderCompose(){
-  const tb = document.getElementById('order-compose-items');
-  if(!tb) return;
-  if(!S.items.length){
-    tb.innerHTML='<tr class="no-data"><td colspan="9">품목 없음</td></tr>';
+  renderOrderComposeHeader();
+  renderOrderComposeTabs();
+  const container = document.getElementById('order-compose-items');
+  if(!container) return;
+  if(!orderComposeOpen) return;  // 접혀있으면 안 그림 (성능)
+
+  const q = (document.getElementById('oc-search')?.value||'').toLowerCase();
+  const list = S.items.filter(i =>
+    (orderComposeCat==='all' || i.cat===orderComposeCat) &&
+    (!q || i.name.toLowerCase().includes(q))
+  );
+
+  if(!list.length){
+    container.innerHTML = '<div class="empty" style="padding:30px">표시할 품목 없음</div>';
+    updateOrderComposeCount();
     return;
   }
-  // 상태 순으로 정렬: red → yellow → green/unknown
-  const sorted = [...S.items].sort((a,b)=>{
-    const rank = {red:0, yellow:1, green:2, unknown:3};
-    return (rank[status(a)]||3) - (rank[status(b)]||3);
-  });
-  tb.innerHTML = sorted.map(i=>{
+
+  // 상태별 그룹핑
+  const groups = { red:[], yellow:[], green:[] };
+  list.forEach(i=>{
     const st = status(i);
-    const wl = weeksLeft(i);
-    const w  = getWeekly(i);
-    const rec = recommended(i);
-    const stColor = st==='red'?'cr':st==='yellow'?'cy':'';
-    const rowBg = st==='red'?'background:var(--red-dim)':st==='yellow'?'background:var(--yellow-dim)':'';
-    return `<tr id="ocrow-${i.id}" style="${rowBg}">
-      <td style="text-align:center">
-        <input type="checkbox" class="oc-check" data-id="${i.id}"
-          onchange="updateOrderComposeCount()"
-          ${st==='red'?'checked':''}>
-      </td>
-      <td><strong>${esc(i.name)}</strong>${i.memo?`<br><span class="c3" style="font-size:10px">${esc(i.memo)}</span>`:''}
-      </td>
-      <td>${catTag(i.cat)}</td>
-      <td class="mono ${stColor}">${i.stock} ${i.unit}</td>
-      <td class="mono c2">${w?w+' '+i.unit+'/주':'—'}</td>
-      <td class="mono ${stColor}">${wl!==null?wl+'주':'—'}</td>
-      <td>${chip(st)}</td>
-      <td>
-        <input type="number" min="0" step="any" value="${rec||''}" placeholder="${rec||0}"
-          id="oc-qty-${i.id}"
-          style="width:80px;padding:4px 8px;font-size:12px;font-family:var(--mono);border:1px solid var(--border);border-radius:5px;background:var(--surface)">
-        <span class="c3" style="font-size:11px;margin-left:4px">${i.unit}</span>
-      </td>
-      <td>
-        <input type="text" placeholder="메모"
-          id="oc-memo-${i.id}"
-          style="width:120px;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">
-      </td>
-    </tr>`;
-  }).join('');
+    if(st==='red') groups.red.push(i);
+    else if(st==='yellow') groups.yellow.push(i);
+    else groups.green.push(i);  // green/unknown
+  });
+
+  container.innerHTML = ['red','yellow','green'].map(g=>renderOrderGroup(g, groups[g])).join('');
   updateOrderComposeCount();
+}
+
+function renderOrderGroup(groupKey, items){
+  if(!items.length) return '';
+  const cfg = {
+    red:    { icon:'🚨', label:'주문 필요', color:'var(--red)', bg:'var(--red-dim)' },
+    yellow: { icon:'⚠️', label:'주의',     color:'var(--yellow)', bg:'var(--yellow-dim)' },
+    green:  { icon:'✓',  label:'정상',     color:'var(--green)', bg:'var(--green-dim)' }
+  }[groupKey];
+  const open = orderComposeGroupOpen[groupKey];
+  const arrow = open ? '▼' : '▶';
+  const rows = open ? `
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:32px"></th>
+          <th>품목</th>
+          <th>분류</th>
+          <th>현재 재고</th>
+          <th>주간 사용</th>
+          <th>잔여</th>
+          <th>요청 수량</th>
+          <th>메모</th>
+        </tr></thead>
+        <tbody>${items.map(i=>orderComposeRow(i, groupKey)).join('')}</tbody>
+      </table>
+    </div>` : '';
+  return `
+    <div style="border-top:1px solid var(--border)">
+      <div onclick="toggleOrderGroup('${groupKey}')"
+        style="padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;background:${cfg.bg};user-select:none">
+        <span style="font-size:11px;color:${cfg.color};width:14px">${arrow}</span>
+        <strong style="color:${cfg.color};font-size:13px">${cfg.icon} ${cfg.label}</strong>
+        <span class="mono" style="color:${cfg.color};font-size:12px">${items.length}건</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function orderComposeRow(i, groupKey){
+  const wl  = weeksLeft(i);
+  const w   = getWeekly(i);
+  const rec = recommended(i);
+  const stColor = groupKey==='red'?'cr':groupKey==='yellow'?'cy':'';
+  return `<tr id="ocrow-${i.id}">
+    <td style="text-align:center">
+      <input type="checkbox" class="oc-check" data-id="${i.id}"
+        onchange="updateOrderComposeCount()"
+        ${groupKey==='red'?'checked':''}>
+    </td>
+    <td><strong>${esc(i.name)}</strong>${i.memo?`<br><span class="c3" style="font-size:10px">${esc(i.memo)}</span>`:''}</td>
+    <td>${catTag(i.cat)}</td>
+    <td class="mono ${stColor}">${i.stock} ${i.unit}</td>
+    <td class="mono c2">${w?w+' '+i.unit+'/주':'—'}</td>
+    <td class="mono ${stColor}">${wl!==null?wl+'주':'—'}</td>
+    <td>
+      <input type="number" min="0" step="any" value="${rec||''}" placeholder="${rec||0}"
+        id="oc-qty-${i.id}"
+        style="width:80px;padding:4px 8px;font-size:12px;font-family:var(--mono);border:1px solid var(--border);border-radius:5px;background:var(--surface)">
+      <span class="c3" style="font-size:11px;margin-left:4px">${i.unit}</span>
+    </td>
+    <td>
+      <input type="text" placeholder="메모"
+        id="oc-memo-${i.id}"
+        style="width:120px;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--surface)">
+    </td>
+  </tr>`;
+}
+
+function toggleOrderGroup(groupKey){
+  orderComposeGroupOpen[groupKey] = !orderComposeGroupOpen[groupKey];
+  renderOrderCompose();
 }
 
 function updateOrderComposeCount(){
   const checked = document.querySelectorAll('.oc-check:checked').length;
   const el = document.getElementById('order-selected-count');
-  if(el) el.textContent = `${checked}개 선택됨`;
-  // 전체선택 체크박스 동기화
-  const all = document.querySelectorAll('.oc-check').length;
-  const allBox = document.getElementById('order-check-all');
-  if(allBox) allBox.checked = checked > 0 && checked === all;
-}
-
-function toggleAllOrderItems(checked){
-  document.querySelectorAll('.oc-check').forEach(cb=>{ cb.checked = checked; });
-  updateOrderComposeCount();
+  if(el) el.textContent = `${checked}개 선택`;
 }
 
 function selectOrderItems(mode){
@@ -2052,9 +2134,9 @@ function selectOrderItems(mode){
     const item = S.items.find(i=>i.id===id);
     if(!item){ cb.checked = false; return; }
     const st = status(item);
-    if(mode==='red')    cb.checked = st==='red';
+    if(mode==='red')         cb.checked = st==='red';
     else if(mode==='yellow') cb.checked = st==='red'||st==='yellow';
-    else cb.checked = false;
+    else                     cb.checked = false;
   });
   updateOrderComposeCount();
 }
@@ -2088,7 +2170,6 @@ function submitOrderCompose(){
   pushCfg();
   renderDash();
   renderOrderRequests();
-  // 선택 해제
   selectOrderItems('none');
   alert(`✓ ${entries.length}개 품목 주문 요청 완료`);
 }
